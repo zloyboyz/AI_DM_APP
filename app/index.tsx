@@ -10,8 +10,8 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, Sword, Globe, Dices, MessageCircle, User, Map } from 'lucide-react-native';
-import { useAudioManager } from './hooks/useAudioManager';
-import { SessionIdModal } from '../components/SessionIdModal';
+import { useAudioManager } from '../lib/hooks/useAudioManager';
+import { SessionIdModal } from '../lib/components/SessionIdModal';
 import { useSessionId } from '../lib/useSessionId';
 
 const { width, height } = Dimensions.get('window');

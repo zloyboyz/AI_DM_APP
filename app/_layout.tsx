@@ -2,8 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SplashScreen } from 'expo-splash-screen';
 import { Platform } from 'react-native';
-import { useAudioManager } from './hooks/useAudioManager'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady'
+import { useAudioManager } from '../lib/hooks/useAudioManager'
+import { useFrameworkReady } from '../lib/hooks/useFrameworkReady'
 
 // Prevent the splash screen from auto-hiding before App component declaration
 if (Platform.OS !== 'web') {

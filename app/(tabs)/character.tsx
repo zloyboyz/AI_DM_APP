@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CreditCard as Edit3, Plus, Heart, Shield, Zap, Chrome as Home } from 'lucide-react-native';
-import { useAudioManager } from '../hooks/useAudioManager';
+import { useAudioManager } from '../../lib/hooks/useAudioManager';
 
 interface CharacterData {
   name: string;

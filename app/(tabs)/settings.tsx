@@ -11,9 +11,9 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Volume2, Music, VolumeX, User, Bell, Download, Upload, CircleHelp as HelpCircle, Mail, Shield, LogOut, Chrome as Home } from 'lucide-react-native';
-import { useAudioManager } from '../hooks/useAudioManager';
-import { VolumeSlider } from '../components/VolumeSlider';
-import { AudioToggle } from '../components/AudioToggle';
+import { useAudioManager } from '../../lib/hooks/useAudioManager';
+import { VolumeSlider } from '../../lib/components/VolumeSlider';
+import { AudioToggle } from '../../lib/components/AudioToggle';
 
 export default function SettingsScreen() {
   const router = useRouter();

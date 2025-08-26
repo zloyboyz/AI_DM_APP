@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { MessageCircle, User, Map, Settings } from 'lucide-react-native';
-import { useAudioManager } from '../hooks/useAudioManager';
+import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { Pressable, View, Text, StyleSheet, Animated } from 'react-native';
 import { useRef, useEffect } from 'react';
 

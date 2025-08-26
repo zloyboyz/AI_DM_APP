@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Chrome as Home, Sword, Trees, Crown, Layers, Search } from 'lucide-react-native';
-import { useAudioManager } from '../hooks/useAudioManager';
+import { useAudioManager } from '../../lib/hooks/useAudioManager';
 
 export default function MapScreen() {
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
