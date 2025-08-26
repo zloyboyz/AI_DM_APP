@@ -3,7 +3,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useCallback } from 'react';
 import { Platform, View } from 'react-native'
 import { useFrameworkReady } from '../hooks/useFrameworkReady'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 
 // Keep the splash screen up until the first layout.
 // IMPORTANT: no top-level `await` — use `void` to ignore the promise.
