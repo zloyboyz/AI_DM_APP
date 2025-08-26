@@ -1,24 +1,34 @@
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useAudioManager } from '../lib/hooks/useAudioManager'
-import { useFrameworkReady } from '../lib/hooks/useFrameworkReady'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady'
+import * as SplashScreen from 'expo-splash-screen';
+import React, { useCallback } from 'react';
+import { Platform, View } from 'react-native';
+
+// Keep the splash screen up until the first layout.
+// IMPORTANT: no top-level `await` — use `void` to ignore the promise.
+if (Platform.OS !== 'web') {
+  void SplashScreen.preventAutoHideAsync();
+}
 
 export default function RootLayout() {
-  useFrameworkReady();
-  
-  // Initialize audio at the root level so it persists across navigation
-  useAudioManager();
-
+  // Called after the first layout; safe place to hide splash.
+  const onLayoutRootView = useCallback(async () => {
+    if (Platform.OS !== 'web') {
+      try {
+        await SplashScreen.hideAsync();
+      } catch {
+        // no-op
+      }
+    }
+  }, []);
 
   return (
-    <>
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      {/* Hide headers globally; tweak as you like */}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <StatusBar style="auto" />
-    </>
+    </View>
   );
 }
