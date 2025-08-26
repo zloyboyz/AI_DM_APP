@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAudioManager } from '../lib/hooks/useAudioManager'
 import { useFrameworkReady } from '../lib/hooks/useFrameworkReady'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 
 export default function RootLayout() {
   useFrameworkReady();
