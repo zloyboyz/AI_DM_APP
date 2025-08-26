@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CreditCard as Edit3, Plus, Heart, Shield, Zap, Chrome as Home } from 'lucide-react-native';
+import { Edit3, Plus, Heart, Shield, Zap, Home } from 'lucide-react-native';
 import { useAudioManager } from '../hooks/useAudioManager';
 
 interface CharacterData {
