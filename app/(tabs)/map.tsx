@@ -98,7 +98,7 @@ export default function MapScreen() {
               
               {/* Sample location markers */}
               <View style={[styles.locationMarker, styles.townMarker, { top: 120, left: 80 }]}>
-                <HomeIcon size={20} color="#f59e0b" />
+                <Home size={20} color="#f59e0b" />
               </View>
               
               <View style={[styles.locationMarker, styles.dungeonMarker, { top: 200, right: 100 }]}>
