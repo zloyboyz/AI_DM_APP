@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Home, Sword, Trees, Crown, Layers, Search } from 'lucide-react-native';
+import { Chrome as Home, Sword, Trees, Crown, Layers, Search } from 'lucide-react-native';
 import { useAudioManager } from '../hooks/useAudioManager';
 
 export default function MapScreen() {

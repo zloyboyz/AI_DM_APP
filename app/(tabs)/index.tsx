@@ -12,7 +12,7 @@ import {
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mic, Send, Crown, Play, Pause, Home } from 'lucide-react-native';
+import { Mic, Send, Crown, Play, Pause, Chrome as Home } from 'lucide-react-native';
 import { useAudioManager } from '../hooks/useAudioManager';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';

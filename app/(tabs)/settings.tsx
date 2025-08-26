@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Volume2, Music, VolumeX, User, Bell, Download, Upload, HelpCircle, Mail, Shield, LogOut, Home } from 'lucide-react-native';
+import { Volume2, Music, VolumeX, User, Bell, Download, Upload, CircleHelp as HelpCircle, Mail, Shield, LogOut, Chrome as Home } from 'lucide-react-native';
 import { useAudioManager } from '../hooks/useAudioManager';
 import { VolumeSlider } from '../components/VolumeSlider';
 import { AudioToggle } from '../components/AudioToggle';
