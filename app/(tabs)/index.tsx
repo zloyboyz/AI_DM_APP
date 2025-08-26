@@ -16,27 +16,28 @@ import { Mic, Send, Crown, Play, Pause, Chrome as Home } from 'lucide-react-nati
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { useVoiceRecording } from '../../lib/hooks/useVoiceRecording';
 import { useAudioPlayback } from '../../lib/hooks/useAudioPlayback';
-import { DmResponse } from '../../lib/types/dm';
 import { useSessionId } from '../../lib/useSessionId';
 import { postJSON } from '../../lib/api';
-import { getLastMessageForSession } from '../../lib/supabase';
+import { 
+  loadChat, 
+  appendChat, 
+  vacuumOldAudio, 
+  cacheAudioBlob, 
+  ChatMessage, 
+  AudioRef 
+} from '../../lib/storage';
 import Constants from 'expo-constants';
+
+interface DmResponse {
+  text: string;
+  audio?: AudioRef[];
+}
 
 // Direct webhook URL - bypassing the API route
 const WEBHOOK_URL = 'https://zloyboy.app.n8n.cloud/webhook/1f43cae2-44e2-4bc5-b5fe-e3ec5b44f4c8';
 
-interface Message {
-  id: string;
-  type: 'narrator' | 'npc' | 'system' | 'user';
-  content: string;
-  timestamp: string;
-  speaker?: string;
-  audioUri?: string;
-  audioUris?: string[];
-}
-
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const router = useRouter();
   const { playClickSound } = useAudioManager();
   const { 
@@ -48,12 +49,10 @@ export default function ChatScreen() {
     requestPermission 
   } = useVoiceRecording();
   const { isPlaying, playAudio, stopAudio, currentlyPlayingId } = useAudioPlayback();
-  const { preloadAudio } = useAudioPlayback();
 
   const { sessionId } = useSessionId();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [hasLoadedInitialMessage, setHasLoadedInitialMessage] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Auto-scroll to bottom when messages change
@@ -68,68 +67,45 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-  // Load last message when sessionId changes
+  // Load chat history when sessionId changes
   useEffect(() => {
-    const loadLastMessage = async () => {
-      if (!sessionId) {
-        setHasLoadedInitialMessage(true);
-        return;
-      }
-
-      if (hasLoadedInitialMessage) {
-        return;
-      }
-
+    const loadChatHistory = async () => {
       try {
-        const lastMessage = await getLastMessageForSession(sessionId);
+        // Clean up old audio on app start
+        await vacuumOldAudio();
         
-        if (lastMessage) {
-          // Handle the message content properly - it might be an object or string
-          let messageContent = '';
-          if (typeof lastMessage.message === 'string') {
-            messageContent = lastMessage.message;
-          } else if (typeof lastMessage.message === 'object' && lastMessage.message !== null) {
-            // If it's an object, try to extract text content
-            messageContent = lastMessage.message.text || 
-                           lastMessage.message.content || 
-                           JSON.stringify(lastMessage.message);
-          } else {
-            messageContent = String(lastMessage.message || '');
-          }
-          
-          const initialMessage: Message = {
-            id: `initial-${lastMessage.id}`,
-            type: 'narrator',
-            content: messageContent,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            speaker: 'AI Dungeon Master',
-          };
-          
-          setMessages([initialMessage]);
+        if (sessionId) {
+          const chatHistory = await loadChat(sessionId);
+          setMessages(chatHistory);
+        } else {
+          setMessages([]);
         }
-        
-        setHasLoadedInitialMessage(true);
       } catch (error) {
-        console.error('Error loading initial message:', error);
-        setHasLoadedInitialMessage(true);
+        console.error('Error loading chat history:', error);
+        setMessages([]);
       }
     };
 
-    loadLastMessage();
-  }, [sessionId, hasLoadedInitialMessage]);
+    loadChatHistory();
+  }, [sessionId]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
     playClickSound();
     const now = new Date();
-    const userMsg: Message = {
+    const userMsg: ChatMessage = {
       id: Date.now().toString(),
-      type: 'user',
-      content: inputText.trim(),
-      timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      role: 'user',
+      text: inputText.trim(),
+      ts: now.getTime(),
     };
     setMessages(prev => [...prev, userMsg]);
+    
+    // Persist user message
+    if (sessionId) {
+      await appendChat(sessionId, userMsg);
+    }
 
     const messageContent = inputText.trim();
     setInputText('');
@@ -147,43 +123,54 @@ export default function ChatScreen() {
 
       // Check if we got a valid response
       if (!data || typeof data !== 'object' || !data.text) {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            type: 'system',
-            content: 'The AI Dungeon Master is thinking...',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ]);
+        const systemMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'dm',
+          text: 'The AI Dungeon Master is thinking...',
+          ts: Date.now(),
+        };
+        setMessages(prev => [...prev, systemMsg]);
+        if (sessionId) {
+          await appendChat(sessionId, systemMsg);
+        }
         return;
       }
 
-      // Create a single message with both text and audio
-      const audioArr = Array.isArray(data.audio) ? data.audio : [];
-      const audioUris = audioArr.filter(clip => clip?.public_url).map(clip => clip.public_url);
-      
-      const dmMessage: Message = {
+      // Create DM message
+      const dmMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'narrator',
-        content: String(data.text) || 'AI Dungeon Master responds',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        audioUris: audioUris.length > 0 ? audioUris : undefined,
+        role: 'dm',
+        text: String(data.text) || 'AI Dungeon Master responds',
+        audio: data.audio || [],
+        ts: Date.now(),
       };
       
       setMessages(prev => [...prev, dmMessage]);
+      
+      // Persist DM message
+      if (sessionId) {
+        await appendChat(sessionId, dmMessage);
+        
+        // Cache audio files
+        if (data.audio && data.audio.length > 0) {
+          data.audio.forEach(audioRef => {
+            cacheAudioBlob(sessionId, audioRef);
+          });
+        }
+      }
 
     } catch (err) {
       console.error('Error sending message to webhook:', err);
-      setMessages(prev => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          type: 'system',
-          content: 'Connection error. Please try again.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      const errorMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'dm',
+        text: 'Connection error. Please try again.',
+        ts: Date.now(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      if (sessionId) {
+        await appendChat(sessionId, errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -197,14 +184,18 @@ export default function ChatScreen() {
       const audioData = await stopRecording();
       if (audioData) {
         // For now, just add a message indicating voice recording was captured
-        const voiceMessage: Message = {
+        const voiceMessage: ChatMessage = {
           id: Date.now().toString(),
-          type: 'user',
-          content: `🎤 Voice message recorded (${recordingDuration}s)`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          audioUri: audioData.uri,
+          role: 'user',
+          text: `🎤 Voice message recorded (${recordingDuration}s)`,
+          ts: Date.now(),
         };
         setMessages(prev => [...prev, voiceMessage]);
+        
+        // Persist voice message
+        if (sessionId) {
+          await appendChat(sessionId, voiceMessage);
+        }
         
         // Send voice message to webhook
         setIsLoading(true);
@@ -243,56 +234,52 @@ export default function ChatScreen() {
           if (ct.includes('application/json') && text.trim()) {
             const data: DmResponse = JSON.parse(text);
 
-            // Create a single message with both text and audio
-            const audioArr = Array.isArray(data.audio) ? data.audio : [];
-            const audioUris = audioArr.filter(clip => clip?.public_url).map(clip => clip.public_url);
-            
-            const dmMessage: Message = {
+            // Create DM message
+            const dmMessage: ChatMessage = {
               id: (Date.now() + 1).toString(),
-              type: 'narrator',
-              content: data.text || 'AI Dungeon Master responds',
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              audioUris: audioUris.length > 0 ? audioUris : undefined,
+              role: 'dm',
+              text: data.text || 'AI Dungeon Master responds',
+              audio: data.audio || [],
+              ts: Date.now(),
             };
             
             setMessages(prev => [...prev, dmMessage]);
 
-            // Preload audio for instant playback
-            if (audioUris.length > 0) {
-              audioUris.forEach((audioUri, index) => {
-                const audioId = audioUris.length > 1 ? `${dmMessage.id}-${index}` : dmMessage.id;
-                preloadAudio(audioUri, audioId);
-              });
-            }
-
-            // Preload audio for instant playback
-            if (audioUris.length > 0) {
-              audioUris.forEach((audioUri, index) => {
-                const audioId = audioUris.length > 1 ? `${dmMessage.id}-${index}` : dmMessage.id;
-                preloadAudio(audioUri, audioId);
-              });
+            // Persist DM message and cache audio
+            if (sessionId) {
+              await appendChat(sessionId, dmMessage);
+              
+              if (data.audio && data.audio.length > 0) {
+                data.audio.forEach(audioRef => {
+                  cacheAudioBlob(sessionId, audioRef);
+                });
+              }
             }
 
           } else {
-            setMessages(prev => [
-              ...prev,
-              {
-                id: (Date.now() + 1).toString(),
-                type: 'system',
-                content: text || 'Voice message sent successfully.',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              },
-            ]);
+            const successMsg: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              role: 'dm',
+              text: text || 'Voice message sent successfully.',
+              ts: Date.now(),
+            };
+            setMessages(prev => [...prev, successMsg]);
+            if (sessionId) {
+              await appendChat(sessionId, successMsg);
+            }
           }
         } catch (error) {
           console.error('Error sending voice message:', error);
-          const errorMessage: Message = {
+          const errorMessage: ChatMessage = {
             id: (Date.now() + 2).toString(),
-            type: 'system',
-            content: 'Failed to send voice message. Please try again.',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            role: 'dm',
+            text: 'Failed to send voice message. Please try again.',
+            ts: Date.now(),
           };
           setMessages(prev => [...prev, errorMessage]);
+          if (sessionId) {
+            await appendChat(sessionId, errorMessage);
+          }
         } finally {
           setIsLoading(false);
         }
@@ -302,13 +289,16 @@ export default function ChatScreen() {
       if (!hasPermission) {
         const granted = await requestPermission();
         if (!granted) {
-          const errorMessage: Message = {
+          const errorMessage: ChatMessage = {
             id: Date.now().toString(),
-            type: 'system',
-            content: 'Microphone permission is required for voice recording.',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            role: 'dm',
+            text: 'Microphone permission is required for voice recording.',
+            ts: Date.now(),
           };
           setMessages(prev => [...prev, errorMessage]);
+          if (sessionId) {
+            await appendChat(sessionId, errorMessage);
+          }
           return;
         }
       }
@@ -317,7 +307,7 @@ export default function ChatScreen() {
     }
   };
 
-  const handlePlayVoiceMessage = async (messageId: string, audioUri: string) => {
+  const handlePlayVoiceMessage = async (messageId: string, audioSource: string) => {
     playClickSound();
     
     if (currentlyPlayingId === messageId && isPlaying) {
@@ -325,19 +315,19 @@ export default function ChatScreen() {
       await stopAudio();
     } else {
       // Play this message
-      await playAudio(audioUri, messageId);
+      await playAudio(audioSource, messageId, sessionId || undefined);
     }
   };
 
-  const handlePlayMultipleAudio = async (messageId: string, audioUris: string[]) => {
+  const handlePlayMultipleAudio = async (messageId: string, audioRefs: AudioRef[]) => {
     playClickSound();
     
     if (currentlyPlayingId === messageId && isPlaying) {
       // Stop if currently playing this message
       await stopAudio();
     } else {
-      // Play all audio files in sequence
-      await playAudio(audioUris, messageId);
+      // Play all audio files in sequence  
+      await playAudio(audioRefs, messageId, sessionId || undefined);
     }
   };
 
@@ -346,9 +336,9 @@ export default function ChatScreen() {
     router.push('../');
   };
 
-  const renderMessage = (message: Message) => {
-    const isUser = message.type === 'user';
-   console.log('Rendering message:', message);
+  const renderMessage = (message: ChatMessage) => {
+    const isUser = message.role === 'user';
+    const timestamp = new Date(message.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     return (
       <View
@@ -361,47 +351,25 @@ export default function ChatScreen() {
           <View style={styles.messageHeader}>
             <Crown size={16} color="#8b5cf6" />
             <Text style={styles.speakerName}>
-              {message.type === 'narrator' ? 'AI Dungeon Master' :
-               message.type === 'system' ? 'System' :
-               message.speaker || 'NPC'}
+              AI Dungeon Master
             </Text>
-            <Text style={styles.messageTime}>{message.timestamp}</Text>
+            <Text style={styles.messageTime}>{timestamp}</Text>
           </View>
         )}
         
         <Text style={[
           styles.messageText,
           isUser ? styles.userMessageText : styles.dmMessageText,
-          message.type === 'system' && styles.systemMessageText,
         ]}>
-          {message.content}
+          {message.text}
         </Text>
         
         {/* Audio playback buttons */}
-        {message.audioUri && (
+        {message.audio && message.audio.length > 0 && (
           <View style={styles.audioContainer}>
             <View style={styles.voiceMessageContainer}>
               <Pressable
-                onPress={() => handlePlayVoiceMessage(message.id, message.audioUri!)}
-                style={styles.playButton}>
-                {currentlyPlayingId === message.id && isPlaying ? (
-                  <Pause size={16} color="#4a5568" />
-                ) : (
-                  <Play size={16} color="#4a5568" />
-                )}
-              </Pressable>
-              <Text style={styles.voiceMessageText}>
-                {currentlyPlayingId === message.id && isPlaying ? 'Playing...' : 'Tap to play'}
-              </Text>
-            </View>
-          </View>
-        )}
-        
-        {message.audioUris && message.audioUris.length > 0 && (
-          <View style={styles.audioContainer}>
-            <View style={styles.voiceMessageContainer}>
-              <Pressable
-                onPress={() => handlePlayMultipleAudio(message.id, message.audioUris!)}
+                onPress={() => handlePlayMultipleAudio(message.id, message.audio!)}
                 style={styles.playButton}>
                 {currentlyPlayingId === message.id && isPlaying ? (
                   <Pause size={16} color="#4a5568" />
@@ -412,14 +380,14 @@ export default function ChatScreen() {
               <Text style={styles.voiceMessageText}>
                 {currentlyPlayingId === message.id && isPlaying 
                   ? 'Playing...' 
-                  : `Play all (${message.audioUris.length} clips)`}
+                  : `Play all (${message.audio.length} clips)`}
               </Text>
             </View>
           </View>
         )}
         
         {isUser && (
-          <Text style={styles.userMessageTime}>{message.timestamp}</Text>
+          <Text style={styles.userMessageTime}>{timestamp}</Text>
         )}
         
         {/* Debug: Session ID */}
@@ -580,10 +548,6 @@ const styles = StyleSheet.create({
   },
   dmMessageText: {
     color: '#e2e8f0',
-  },
-  systemMessageText: {
-    color: '#fbbf24',
-    fontStyle: 'italic',
   },
   userMessageTime: {
     fontSize: 10,
