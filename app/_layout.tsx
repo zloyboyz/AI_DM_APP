@@ -2,26 +2,20 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useCallback } from 'react';
 import { Platform, View } from 'react-native';
-import { useFrameworkReady } from '../hooks/useFrameworkReady'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
-// Keep the splash screen up until the first layout.
-// IMPORTANT: no top-level `await` — use `void` to ignore the promise.
+// Keep the splash screen up until the first layout. No top-level await.
 if (Platform.OS !== 'web') {
   void SplashScreen.preventAutoHideAsync();
 }
 
 export default function RootLayout() {
+  // Initialize audio/fonts/whatever your hook sets up.
   useFrameworkReady();
-  
-  // Called after the first layout; safe place to hide splash.
-  const onLayoutRootView = useCallback(async () => {
+
+  const onLayoutRootView = useCallback(() => {
     if (Platform.OS !== 'web') {
-      try {
-        await SplashScreen.hideAsync();
-      } catch {
-        // no-op
-      }
+      void SplashScreen.hideAsync();
     }
   }, []);
 
