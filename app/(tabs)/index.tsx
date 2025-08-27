@@ -12,7 +12,7 @@ import {
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mic, Send, Crown, Play, Pause, Chrome as Home } from 'lucide-react-native';
+import { Mic, Send, Crown, Play, Pause, House } from 'lucide-react-native';
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { useVoiceRecording } from '../../lib/hooks/useVoiceRecording';
 import { useAudioPlayback } from '../../lib/hooks/useAudioPlayback';
@@ -400,7 +400,7 @@ export default function ChatScreen() {
     <LinearGradient colors={['#0f0727', '#1a0b2e']} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={handleGoHome} style={styles.homeButton}>
-          <Home size={20} color="#8b5cf6" />
+          <House size={20} color="#8b5cf6" />
         </Pressable>
         <Text style={styles.headerTitle}>AI Dungeon Master</Text>
         <Text style={styles.headerSubtitle}>Active Session</Text>

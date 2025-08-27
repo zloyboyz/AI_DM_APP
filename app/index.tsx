@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Sword, Globe, Dices, MessageCircle, User, Map, Chrome as Home } from 'lucide-react-native';
+import { Sparkles, Sword, Globe, Dices, MessageCircle, User, Map, House } from 'lucide-react-native';
 import { useAudioManager } from '../lib/hooks/useAudioManager';
 import { SessionIdModal } from '../lib/components/SessionIdModal';
 import { useSessionId } from '../lib/useSessionId';
@@ -99,7 +99,7 @@ export default function WelcomeScreen() {
           </View>
           <View style={styles.quickAccessCard}>
             <View style={styles.quickAccessIcon}>
-              <User size={24} color="#f59e0b" />
+              <House size={24} color="#06b6d4" />
             </View>
             <Text style={styles.quickAccessTitle}>Manage your character</Text>
           </View>

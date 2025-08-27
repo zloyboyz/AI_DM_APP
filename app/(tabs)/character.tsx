@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CreditCard as Edit3, Plus, Heart, Shield, Zap, Chrome as Home } from 'lucide-react-native';
+import { CreditCard as Edit3, Plus, Heart, Shield, Zap, House } from 'lucide-react-native';
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 
 interface CharacterData {
@@ -96,7 +96,7 @@ export default function CharacterScreen() {
     <LinearGradient colors={['#0f0727', '#1a0b2e']} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={handleGoHome} style={styles.homeButton}>
-          <Home size={20} color="#8b5cf6" />
+          <House size={20} color="#8b5cf6" />
         </Pressable>
         <View style={styles.headerContent}>
           <View>

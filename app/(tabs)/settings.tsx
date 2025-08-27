@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Volume2, Music, VolumeX, User, Bell, Download, Upload, CircleHelp as HelpCircle, Mail, Shield, LogOut, Chrome as Home } from 'lucide-react-native';
+import { Volume2, Music, VolumeX, User, Bell, Download, Upload, CircleHelp as HelpCircle, Mail, Shield, LogOut, House } from 'lucide-react-native';
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { VolumeSlider } from '../../lib/components/VolumeSlider';
 import { AudioToggle } from '../../lib/components/AudioToggle';
@@ -125,7 +125,7 @@ export default function SettingsScreen() {
     <LinearGradient colors={['#0f0727', '#1a0b2e']} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={handleGoHome} style={styles.homeButton}>
-          <Home size={20} color="#8b5cf6" />
+          <House size={20} color="#8b5cf6" />
         </Pressable>
         <Text style={styles.headerTitle}>Settings</Text>
         <Text style={styles.headerSubtitle}>Customize your adventure</Text>

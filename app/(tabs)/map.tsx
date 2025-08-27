@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Chrome as Home, Sword, Trees, Crown, Layers, Search } from 'lucide-react-native';
+import { House, Sword, Trees, Crown, Layers, Search } from 'lucide-react-native';
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 
 export default function MapScreen() {
@@ -18,7 +18,7 @@ export default function MapScreen() {
   const { playClickSound } = useAudioManager();
 
   const legendItems = [
-    { icon: Home, label: 'Towns', color: '#f59e0b', key: 'towns' },
+    { icon: House, label: 'Towns', color: '#f59e0b', key: 'towns' },
     { icon: Sword, label: 'Dungeons', color: '#ef4444', key: 'dungeons' },
     { icon: Trees, label: 'Wilderness', color: '#22c55e', key: 'wilderness' },
     { icon: Crown, label: 'Boss', color: '#8b5cf6', key: 'boss' },
@@ -37,7 +37,7 @@ export default function MapScreen() {
     <LinearGradient colors={['#0f0727', '#1a0b2e']} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={handleGoHome} style={styles.homeButton}>
-          <Home size={20} color="#8b5cf6" />
+          <House size={20} color="#8b5cf6" />
         </Pressable>
         <Text style={styles.headerTitle}>Adventure Map</Text>
         <View style={styles.headerActions}>
@@ -98,7 +98,7 @@ export default function MapScreen() {
               
               {/* Sample location markers */}
               <View style={[styles.locationMarker, styles.townMarker, { top: 120, left: 80 }]}>
-                <Home size={20} color="#f59e0b" />
+                <House size={20} color="#f59e0b" />
               </View>
               
               <View style={[styles.locationMarker, styles.dungeonMarker, { top: 200, right: 100 }]}>
