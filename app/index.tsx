@@ -123,7 +123,9 @@ export default function WelcomeScreen() {
           <LinearGradient
             colors={['#6366f1', '#8b5cf6']}
             style={styles.ctaGradient}>
-            <Text style={styles.ctaText}>🔮 Begin Your Adventure</Text>
+            <Text style={styles.ctaText}>
+              {sessionId ? '🔮 Continue Your Adventure' : '🔮 Begin Your Adventure'}
+            </Text>
           </LinearGradient>
         </Pressable>
 
