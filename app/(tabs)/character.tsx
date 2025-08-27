@@ -99,19 +99,17 @@ export default function CharacterScreen() {
           <House size={20} color="#8b5cf6" />
         </Pressable>
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.characterName}>{character.name}</Text>
-            <Text style={styles.characterDetails}>
-              Level {character.level} {character.race} {character.class}
-            </Text>
-          </View>
-          <Pressable onPress={() => {
-            playClickSound();
-            setEditModalVisible(true);
-          }} style={styles.editButton}>
-            <Edit3 size={20} color="#8b5cf6" />
-          </Pressable>
+          <Text style={styles.characterName}>{character.name}</Text>
+          <Text style={styles.characterDetails}>
+            Level {character.level} {character.race} {character.class}
+          </Text>
         </View>
+        <Pressable onPress={() => {
+          playClickSound();
+          setEditModalVisible(true);
+        }} style={styles.editButton}>
+          <Edit3 size={20} color="#8b5cf6" />
+        </Pressable>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -275,27 +273,35 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    paddingHorizontal: 60, // Add padding to account for home button and edit button
   },
   characterName: {
     fontSize: 24,
     fontWeight: '700',
     color: '#e2e8f0',
+    textAlign: 'center',
   },
   characterDetails: {
     fontSize: 14,
     color: '#8b5cf6',
     marginTop: 4,
+    textAlign: 'center',
   },
   editButton: {
+    position: 'absolute',
+    top: 60,
+    right: 24,
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   content: {
     flex: 1,
