@@ -312,6 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8b5cf6',
     marginTop: 4,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
