@@ -11,13 +11,18 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Volume2, Music, VolumeX, User, Bell, Download, Upload, CircleHelp as HelpCircle, Mail, Shield, LogOut, House } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { VolumeSlider } from '../../lib/components/VolumeSlider';
 import { AudioToggle } from '../../lib/components/AudioToggle';
+import { useSessionId } from '../../lib/useSessionId';
+import { clearChat } from '../../lib/storage';
+import localforage from 'localforage';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { audioSettings, updateAudioSettings, playClickSound } = useAudioManager();
+  const { sessionId } = useSessionId();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [username, setUsername] = useState('AdventurerX');
   const [email, setEmail] = useState('adventurer@example.com');
@@ -42,6 +47,64 @@ export default function SettingsScreen() {
   const handleImportCharacter = () => {
     playClickSound();
     Alert.alert('Import Character', 'Select a character file to import.');
+  };
+
+  const handleDeleteTextHistory = () => {
+    playClickSound();
+    Alert.alert(
+      'Delete Text History',
+      'This will permanently delete all your chat text messages. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              if (sessionId) {
+                await clearChat(sessionId);
+                Alert.alert('Success', 'Text chat history has been deleted.');
+              } else {
+                Alert.alert('Error', 'No active session found.');
+              }
+            } catch (error) {
+              console.error('Error deleting text history:', error);
+              Alert.alert('Error', 'Failed to delete text history.');
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  const handleDeleteVoiceHistory = () => {
+    playClickSound();
+    Alert.alert(
+      'Delete Voice History',
+      'This will permanently delete all your cached voice messages. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              // Clear audio cache
+              const audioDB = localforage.createInstance({ name: "aidm", storeName: "audio" });
+              const metaDB = localforage.createInstance({ name: "aidm", storeName: "meta" });
+              
+              await audioDB.clear();
+              await metaDB.clear();
+              
+              Alert.alert('Success', 'Voice history has been deleted.');
+            } catch (error) {
+              console.error('Error deleting voice history:', error);
+              Alert.alert('Error', 'Failed to delete voice history.');
+            }
+          }
+        },
+      ]
+    );
   };
 
   const handleSignOut = () => {
@@ -235,6 +298,23 @@ export default function SettingsScreen() {
             <Pressable style={styles.actionButton} onPress={handleImportCharacter}>
               <Upload size={16} color="#8b5cf6" />
               <Text style={styles.actionButtonText}>Import Character</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Data Management */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🗂️ Data Management</Text>
+          
+          <View style={styles.buttonGroup}>
+            <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={handleDeleteTextHistory}>
+              <Trash2 size={16} color="#ef4444" />
+              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete Text History</Text>
+            </Pressable>
+            
+            <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={handleDeleteVoiceHistory}>
+              <Trash2 size={16} color="#ef4444" />
+              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete Voice History</Text>
             </Pressable>
           </View>
         </View>
@@ -436,5 +516,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#8b5cf6',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  deleteButtonText: {
+    color: '#ef4444',
   },
 });
