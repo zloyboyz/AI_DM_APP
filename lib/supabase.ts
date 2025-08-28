@@ -21,13 +21,9 @@ export async function getLastMessageForSession(sessionId: string): Promise<ChatH
       .eq('session_id', sessionId)
       .order('id', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows found - this is expected for new sessions
-        return null;
-      }
       throw error;
     }
 
