@@ -18,6 +18,7 @@ import { useVoiceRecording } from '../../lib/hooks/useVoiceRecording';
 import { useAudioPlayback } from '../../lib/hooks/useAudioPlayback';
 import { useSessionId } from '../../lib/useSessionId';
 import { postJSON } from '../../lib/api';
+import { getLastMessageForSession } from '../../lib/supabase';
 import { 
   loadChat, 
   appendChat, 
@@ -76,7 +77,38 @@ export default function ChatScreen() {
         
         if (sessionId) {
           const chatHistory = await loadChat(sessionId);
-          setMessages(chatHistory);
+          
+          // If no local chat history exists, check Supabase for previous messages
+          if (chatHistory.length === 0) {
+            const lastSupabaseMessage = await getLastMessageForSession(sessionId);
+            if (lastSupabaseMessage) {
+              // Convert Supabase message to ChatMessage format
+              const supabaseMessage: ChatMessage = {
+                id: lastSupabaseMessage.id.toString(),
+                role: 'dm',
+                text: lastSupabaseMessage.message,
+                ts: Date.now(),
+              };
+              
+              // Add a system message to indicate this is from previous session
+              const systemMessage: ChatMessage = {
+                id: (Date.now() - 1).toString(),
+                role: 'dm',
+                text: '--- Continuing from previous session ---',
+                ts: Date.now() - 1,
+              };
+              
+              setMessages([systemMessage, supabaseMessage]);
+              
+              // Save these messages to local storage for future reference
+              await appendChat(sessionId, systemMessage);
+              await appendChat(sessionId, supabaseMessage);
+            } else {
+              setMessages([]);
+            }
+          } else {
+            setMessages(chatHistory);
+          }
         } else {
           setMessages([]);
         }
