@@ -1,11 +1,75 @@
 // lib/storage.ts
 import localforage from "localforage";
-import * as asyncStorageDriver from "localforage-asyncstorage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Configure localforage to use AsyncStorage driver for React Native
+// Define custom AsyncStorage driver for localforage
+const asyncStorageDriver = {
+  _driver: 'asyncStorageWrapper',
+  _initStorage: function(options: any) {
+    return Promise.resolve();
+  },
+  clear: function(callback?: (err: any) => void) {
+    return AsyncStorage.clear().then(() => {
+      if (callback) callback(null);
+    }).catch(callback);
+  },
+  getItem: function(key: string, callback?: (err: any, value: any) => void) {
+    return AsyncStorage.getItem(key).then((result) => {
+      const value = result ? JSON.parse(result) : null;
+      if (callback) callback(null, value);
+      return value;
+    }).catch(callback);
+  },
+  iterate: function(iterator: (value: any, key: string, iterationNumber: number) => any, callback?: (err: any, result: any) => void) {
+    return AsyncStorage.getAllKeys().then((keys) => {
+      return Promise.all(keys.map((key, index) => 
+        AsyncStorage.getItem(key).then((value) => {
+          const parsedValue = value ? JSON.parse(value) : null;
+          return iterator(parsedValue, key, index);
+        })
+      ));
+    }).then((result) => {
+      if (callback) callback(null, result);
+      return result;
+    }).catch(callback);
+  },
+  key: function(n: number, callback?: (err: any, key: string) => void) {
+    return AsyncStorage.getAllKeys().then((keys) => {
+      const key = keys[n] || null;
+      if (callback) callback(null, key);
+      return key;
+    }).catch(callback);
+  },
+  keys: function(callback?: (err: any, keys: string[]) => void) {
+    return AsyncStorage.getAllKeys().then((keys) => {
+      if (callback) callback(null, keys);
+      return keys;
+    }).catch(callback);
+  },
+  length: function(callback?: (err: any, numberOfKeys: number) => void) {
+    return AsyncStorage.getAllKeys().then((keys) => {
+      const length = keys.length;
+      if (callback) callback(null, length);
+      return length;
+    }).catch(callback);
+  },
+  removeItem: function(key: string, callback?: (err: any) => void) {
+    return AsyncStorage.removeItem(key).then(() => {
+      if (callback) callback(null);
+    }).catch(callback);
+  },
+  setItem: function(key: string, value: any, callback?: (err: any, value: any) => void) {
+    return AsyncStorage.setItem(key, JSON.stringify(value)).then(() => {
+      if (callback) callback(null, value);
+      return value;
+    }).catch(callback);
+  }
+};
+
+// Configure localforage to use custom AsyncStorage driver for React Native
 localforage.defineDriver(asyncStorageDriver);
 localforage.setDriver([
-  asyncStorageDriver._driver,
+  'asyncStorageWrapper',
   localforage.INDEXEDDB,
   localforage.WEBSQL,
   localforage.LOCALSTORAGE
