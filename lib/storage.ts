@@ -1,6 +1,6 @@
 // lib/storage.ts
 import localforage from "localforage";
-import * as asyncStorageDriver from "localforage-asyncstorage-driver";
+import * as asyncStorageDriver from "localforage-asyncstorage";
 
 // Configure localforage to use AsyncStorage driver for React Native
 localforage.defineDriver(asyncStorageDriver);
