@@ -1,5 +1,15 @@
 // lib/storage.ts
 import localforage from "localforage";
+import * as asyncStorageDriver from "localforage-asyncstorage";
+
+// Configure localforage to use AsyncStorage driver for React Native
+localforage.defineDriver(asyncStorageDriver);
+localforage.setDriver([
+  asyncStorageDriver._driver,
+  localforage.INDEXEDDB,
+  localforage.WEBSQL,
+  localforage.LOCALSTORAGE
+]);
 
 export type AudioRef = {
   path: string;           // "TestChat/<session>/<message>/narrator_01.mp3"
