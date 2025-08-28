@@ -15,7 +15,7 @@ const asyncStorageDriver = {
   },
   getItem: function(key: string, callback?: (err: any, value: any) => void) {
     return AsyncStorage.getItem(key).then((result) => {
-      const value = result ? JSON.parse(result) : null;
+      const value = result;
       if (callback) callback(null, value);
       return value;
     }).catch(callback);
@@ -24,8 +24,7 @@ const asyncStorageDriver = {
     return AsyncStorage.getAllKeys().then((keys) => {
       return Promise.all(keys.map((key, index) => 
         AsyncStorage.getItem(key).then((value) => {
-          const parsedValue = value ? JSON.parse(value) : null;
-          return iterator(parsedValue, key, index);
+          return iterator(value, key, index);
         })
       ));
     }).then((result) => {
@@ -59,7 +58,7 @@ const asyncStorageDriver = {
     }).catch(callback);
   },
   setItem: function(key: string, value: any, callback?: (err: any, value: any) => void) {
-    return AsyncStorage.setItem(key, JSON.stringify(value)).then(() => {
+    return AsyncStorage.setItem(key, value).then(() => {
       if (callback) callback(null, value);
       return value;
     }).catch(callback);
@@ -94,6 +93,9 @@ export type ChatMessage = {
 const chatDB  = localforage.createInstance({ name: "aidm", storeName: "chats"  });
 const audioDB = localforage.createInstance({ name: "aidm", storeName: "audio"  });
 const metaDB  = localforage.createInstance({ name: "aidm", storeName: "meta"   });
+const sessionDB = localforage.createInstance({ name: "aidm", storeName: "session" });
+
+export { sessionDB };
 
 /** ---------- Chat (array of messages per session) ---------- */
 export async function loadChat(sessionId: string): Promise<ChatMessage[]> {

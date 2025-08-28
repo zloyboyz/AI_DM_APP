@@ -1,15 +1,13 @@
-import { rememberSession, readLastSession } from './storage';
+import { sessionDB } from './storage';
 
-export function getSessionId(): string | null {
-  return readLastSession();
+export async function getSessionId(): Promise<string | null> {
+  return await sessionDB.getItem<string>('lastSessionId');
 }
 
-export function setSessionId(value: string) {
-  rememberSession(value);
+export async function setSessionId(value: string) {
+  await sessionDB.setItem('lastSessionId', value);
 }
 
-export function clearSessionId() {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    localStorage.removeItem('aidm:lastSessionId');
-  }
+export async function clearSessionId() {
+  await sessionDB.removeItem('lastSessionId');
 }

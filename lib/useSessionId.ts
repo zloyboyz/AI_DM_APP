@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react';
 import { getSessionId, setSessionId } from './session';
 
 export function useSessionId() {
-  const [sessionId, setId] = useState<string | null>(() => getSessionId());
+  const [sessionId, setId] = useState<string | null>(null);
 
   useEffect(() => {
-    // ensures state is hydrated on mount even if module cache was empty
-    setId(getSessionId());
+    // Load session ID asynchronously
+    const loadSessionId = async () => {
+      const id = await getSessionId();
+      setId(id);
+    };
+    loadSessionId();
   }, []);
 
-  const update = (v: string) => {
-    setSessionId(v);
+  const update = async (v: string) => {
+    await setSessionId(v);
     setId(v);
   };
 
