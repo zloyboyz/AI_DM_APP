@@ -19,11 +19,9 @@ export async function setSessionId(value: string) {
 export async function clearSessionId() {
   console.log('[session.ts] clearSessionId() -> clearing session');
   try {
-    const sessionId = await sessionDB.getItem<string>('lastSessionId');
-    console.log('[session.ts] getSessionId() -> returning:', sessionId);
-    return sessionId;
+    await sessionDB.removeItem('lastSessionId');
+    console.log('[session.ts] clearSessionId() -> cleared successfully');
   } catch (error) {
-    console.error('[session.ts] getSessionId() -> ERROR retrieving session ID:', error);
-    return null;
+    console.error('[session.ts] clearSessionId() -> ERROR clearing session ID:', error);
   }
 }
