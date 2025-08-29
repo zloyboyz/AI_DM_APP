@@ -75,22 +75,25 @@ const asyncStorageDriver = {
 };
 
 // Configure localforage based on platform
-if (Platform.OS === 'web') {
-  // For web, use IndexedDB, WebSQL, or LocalStorage
-  localforage.setDriver([
-    localforage.LOCALSTORAGE,
-    localforage.INDEXEDDB,
-    localforage.WEBSQL
-  ]);
-} else {
-  // For native platforms, define and use AsyncStorage driver
-  localforage.defineDriver(asyncStorageDriver);
-  localforage.setDriver([
-    'asyncStorageWrapper',
-    localforage.INDEXEDDB,
-    localforage.WEBSQL,
-    localforage.LOCALSTORAGE
-  ]);
+// Only initialize localforage in client-side environments
+if (typeof window !== 'undefined') {
+  if (Platform.OS === 'web') {
+    // For web, use IndexedDB, WebSQL, or LocalStorage
+    localforage.setDriver([
+      localforage.LOCALSTORAGE,
+      localforage.INDEXEDDB,
+      localforage.WEBSQL
+    ]);
+  } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    // For native platforms, define and use AsyncStorage driver
+    localforage.defineDriver(asyncStorageDriver);
+    localforage.setDriver([
+      'asyncStorageWrapper',
+      localforage.INDEXEDDB,
+      localforage.WEBSQL,
+      localforage.LOCALSTORAGE
+    ]);
+  }
 }
 
 export type AudioRef = {
