@@ -208,10 +208,19 @@ export default function ChatScreen() {
 
     } catch (err) {
       console.error('Error sending message to webhook:', err);
+      
+      // Check if it's a webhook configuration error
+      const errorText = err instanceof Error ? err.message : String(err);
+      let errorMessage = 'Connection error. Please try again.';
+      
+      if (errorText.includes('404') && errorText.includes('webhook')) {
+        errorMessage = 'The AI Dungeon Master is currently offline. The webhook service needs to be activated.';
+      }
+      
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'dm',
-        text: 'Connection error. Please try again.',
+        text: errorMessage,
         ts: Date.now(),
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -317,10 +326,19 @@ export default function ChatScreen() {
           }
         } catch (error) {
           console.error('Error sending voice message:', error);
+          
+          // Check if it's a webhook configuration error
+          const errorText = error instanceof Error ? error.message : String(error);
+          let errorText2 = 'Failed to send voice message. Please try again.';
+          
+          if (errorText.includes('404') && errorText.includes('webhook')) {
+            errorText2 = 'The AI Dungeon Master is currently offline. The webhook service needs to be activated.';
+          }
+          
           const errorMessage: ChatMessage = {
             id: (Date.now() + 2).toString(),
             role: 'dm',
-            text: 'Failed to send voice message. Please try again.',
+            text: errorText2,
             ts: Date.now(),
           };
           setMessages(prev => [...prev, errorMessage]);

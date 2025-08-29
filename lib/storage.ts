@@ -1,17 +1,12 @@
 // lib/storage.ts
 import localforage from "localforage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from 'react-native';
 
 // Define custom AsyncStorage driver for localforage
 const asyncStorageDriver = {
   _driver: 'asyncStorageWrapper',
   _initStorage: function(options: any) {
-    // Check if AsyncStorage is available and functional
-    if (typeof AsyncStorage === 'undefined' || 
-        typeof AsyncStorage.getItem !== 'function' || 
-        typeof AsyncStorage.setItem !== 'function') {
-      return Promise.reject(new Error('AsyncStorage not available'));
-    }
     return Promise.resolve();
   },
   clear: function(callback?: (err: any) => void) {
@@ -21,7 +16,14 @@ const asyncStorageDriver = {
   },
   getItem: function(key: string, callback?: (err: any, value: any) => void) {
     return AsyncStorage.getItem(key).then((result) => {
-      const value = result;
+      let value = null;
+      if (result !== null) {
+        try {
+          value = JSON.parse(result);
+        } catch (e) {
+          value = result; // fallback to raw string if not JSON
+        }
+      }
       if (callback) callback(null, value);
       return value;
     }).catch(callback);
@@ -64,21 +66,32 @@ const asyncStorageDriver = {
     }).catch(callback);
   },
   setItem: function(key: string, value: any, callback?: (err: any, value: any) => void) {
-    return AsyncStorage.setItem(key, value).then(() => {
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+    return AsyncStorage.setItem(key, stringValue).then(() => {
       if (callback) callback(null, value);
       return value;
     }).catch(callback);
   }
 };
 
-// Configure localforage to use custom AsyncStorage driver for React Native
-localforage.defineDriver(asyncStorageDriver);
-localforage.setDriver([
-  'asyncStorageWrapper',
-  localforage.INDEXEDDB,
-  localforage.WEBSQL,
-  localforage.LOCALSTORAGE
-]);
+// Configure localforage based on platform
+if (Platform.OS === 'web') {
+  // For web, use IndexedDB, WebSQL, or LocalStorage
+  localforage.setDriver([
+    localforage.INDEXEDDB,
+    localforage.WEBSQL,
+    localforage.LOCALSTORAGE
+  ]);
+} else {
+  // For native platforms, define and use AsyncStorage driver
+  localforage.defineDriver(asyncStorageDriver);
+  localforage.setDriver([
+    'asyncStorageWrapper',
+    localforage.INDEXEDDB,
+    localforage.WEBSQL,
+    localforage.LOCALSTORAGE
+  ]);
+}
 
 export type AudioRef = {
   path: string;           // "TestChat/<session>/<message>/narrator_01.mp3"
