@@ -26,3 +26,4 @@ export async function clearSessionId() {
     console.error('[session.ts] getSessionId() -> ERROR retrieving session ID:', error);
     return null;
   }
+}
