@@ -6,6 +6,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const asyncStorageDriver = {
   _driver: 'asyncStorageWrapper',
   _initStorage: function(options: any) {
+    // Check if AsyncStorage is available and functional
+    if (typeof AsyncStorage === 'undefined' || 
+        typeof AsyncStorage.getItem !== 'function' || 
+        typeof AsyncStorage.setItem !== 'function') {
+      return Promise.reject(new Error('AsyncStorage not available'));
+    }
     return Promise.resolve();
   },
   clear: function(callback?: (err: any) => void) {
