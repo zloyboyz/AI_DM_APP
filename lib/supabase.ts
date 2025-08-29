@@ -33,3 +33,33 @@ export async function getLastMessageForSession(sessionId: string): Promise<ChatH
     return null;
   }
 }
+
+// Type for the dm_messages table
+export interface DmMessageRecord {
+  id: number;
+  session_id: string;
+  message: string;
+  created_at: string;
+}
+
+// Function to fetch the last DM message for a session
+export async function getLastDmMessageForSession(sessionId: string): Promise<DmMessageRecord | null> {
+  try {
+    const { data, error } = await supabase
+      .from('dm_messages')
+      .select('id, session_id, message, created_at')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching last DM message:', error);
+    return null;
+  }
+}

@@ -18,7 +18,7 @@ import { useVoiceRecording } from '../../lib/hooks/useVoiceRecording';
 import { useAudioPlayback } from '../../lib/hooks/useAudioPlayback';
 import { useSessionId } from '../../lib/useSessionId';
 import { postJSON } from '../../lib/api';
-import { getLastMessageForSession } from '../../lib/supabase';
+import { getLastMessageForSession, getLastDmMessageForSession } from '../../lib/supabase';
 import { 
   loadChat, 
   appendChat, 
@@ -80,7 +80,22 @@ export default function ChatScreen() {
           
           // If no local chat history exists, check Supabase for previous messages
           if (chatHistory.length === 0) {
-            const lastSupabaseMessage = await getLastMessageForSession(sessionId);
+            // First check n8n_chat_histories table
+            let lastSupabaseMessage = await getLastMessageForSession(sessionId);
+            
+            // If no message found, check dm_messages table
+            if (!lastSupabaseMessage) {
+              const lastDmMessage = await getLastDmMessageForSession(sessionId);
+              if (lastDmMessage) {
+                // Convert dm_messages format to chat history format
+                lastSupabaseMessage = {
+                  id: lastDmMessage.id,
+                  session_id: lastDmMessage.session_id,
+                  message: lastDmMessage.message,
+                };
+              }
+            }
+            
             if (lastSupabaseMessage) {
               // Convert Supabase message to ChatMessage format
               const supabaseMessage: ChatMessage = {
