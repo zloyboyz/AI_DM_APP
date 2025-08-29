@@ -78,9 +78,9 @@ const asyncStorageDriver = {
 if (Platform.OS === 'web') {
   // For web, use IndexedDB, WebSQL, or LocalStorage
   localforage.setDriver([
+    localforage.LOCALSTORAGE,
     localforage.INDEXEDDB,
-    localforage.WEBSQL,
-    localforage.LOCALSTORAGE
+    localforage.WEBSQL
   ]);
 } else {
   // For native platforms, define and use AsyncStorage driver

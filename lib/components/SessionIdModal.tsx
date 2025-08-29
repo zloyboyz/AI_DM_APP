@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   Modal,
   TextInput,
   Pressable,
-  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X } from 'lucide-react-native';
+import { getSessionId } from '../session';
 
 interface SessionIdModalProps {
   isOpen: boolean;
@@ -18,21 +20,64 @@ interface SessionIdModalProps {
 }
 
 export function SessionIdModal({ isOpen, onClose, onConfirm }: SessionIdModalProps) {
-  const [sessionId, setSessionId] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [error, setError] = useState('');
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Prefill with current session ID when modal opens
+      const loadCurrentSessionId = async () => {
+        const currentSessionId = await getSessionId();
+        setInputValue(currentSessionId || '');
+      };
+      loadCurrentSessionId();
+      setError('');
+      
+      // Focus input after a short delay to ensure modal is fully rendered
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
+
+  const validateSessionId = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError('Session ID is required');
+      return false;
+    }
+    
+    // Check allowed characters: A-Za-z0-9-_
+    const validPattern = /^[A-Za-z0-9\-_]+$/;
+    if (!validPattern.test(trimmed)) {
+      setError('Session ID can only contain letters, numbers, hyphens, and underscores');
+      return false;
+    }
+    
+    setError('');
+    return true;
+  };
 
   const handleConfirm = () => {
-    if (sessionId.trim()) {
-      onConfirm(sessionId.trim());
-      setSessionId('');
+    const trimmed = inputValue.trim();
+    if (validateSessionId(trimmed)) {
+      onConfirm(trimmed);
       onClose();
-    } else {
-      Alert.alert('Error', 'Please enter a valid session ID');
     }
   };
 
-  const handleClose = () => {
-    setSessionId('');
+  const handleCancel = () => {
+    setError('');
     onClose();
+  };
+
+  const handleInputChange = (text: string) => {
+    setInputValue(text);
+    if (error) {
+      // Clear error when user starts typing
+      setError('');
+    }
   };
 
   return (
@@ -40,58 +85,76 @@ export function SessionIdModal({ isOpen, onClose, onConfirm }: SessionIdModalPro
       visible={isOpen}
       transparent
       animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <LinearGradient
-            colors={['#1e1b4b', '#312e81']}
-            style={styles.modalContent}
-          >
-            <View style={styles.header}>
-              <Text style={styles.title}>Set Session ID</Text>
-              <Pressable onPress={handleClose} style={styles.closeButton}>
-                <X size={24} color="#e2e8f0" />
-              </Pressable>
-            </View>
-
-            <Text style={styles.description}>
-              Enter a session ID to continue your adventure or start a new one.
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              value={sessionId}
-              onChangeText={setSessionId}
-              placeholder="Enter session ID..."
-              placeholderTextColor="#64748b"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <View style={styles.buttonContainer}>
-              <Pressable onPress={handleClose} style={styles.cancelButton}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
+      onRequestClose={onClose}
+      aria-modal="true">
+      <KeyboardAvoidingView 
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Pressable style={styles.backdrop} onPress={onClose}>
+          <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+            <LinearGradient
+              colors={['#1a0b2e', '#2d1b4e']}
+              style={styles.modalContent}>
               
-              <Pressable onPress={handleConfirm} style={styles.confirmButton}>
-                <LinearGradient
-                  colors={['#6366f1', '#8b5cf6']}
-                  style={styles.confirmGradient}
-                >
-                  <Text style={styles.confirmButtonText}>Confirm</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-          </LinearGradient>
-        </View>
-      </View>
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.title}>Set Session ID</Text>
+                <Pressable onPress={handleCancel} style={styles.closeButton}>
+                  <X size={24} color="#94a3b8" />
+                </Pressable>
+              </View>
+
+              {/* Input Section */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Session ID</Text>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.textInput, error && styles.textInputError]}
+                  value={inputValue}
+                  onChangeText={handleInputChange}
+                  placeholder="Enter session ID"
+                  placeholderTextColor="#64748b"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleConfirm}
+                />
+                {error ? (
+                  <Text style={styles.errorText}>{error}</Text>
+                ) : null}
+                <Text style={styles.helperText}>
+                  Only letters, numbers, hyphens, and underscores are allowed
+                </Text>
+              </View>
+
+              {/* Buttons */}
+              <View style={styles.buttonContainer}>
+                <Pressable onPress={handleCancel} style={styles.cancelButton}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={handleConfirm} style={styles.confirmButton}>
+                  <LinearGradient
+                    colors={['#6366f1', '#8b5cf6']}
+                    style={styles.confirmButtonGradient}>
+                    <Text style={styles.confirmButtonText}>Confirm</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
@@ -111,7 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   title: {
     fontSize: 20,
@@ -119,23 +182,44 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
   },
   closeButton: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  description: {
+  inputSection: {
+    marginBottom: 24,
+  },
+  inputLabel: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#94a3b8',
-    marginBottom: 20,
-    lineHeight: 20,
+    marginBottom: 8,
   },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    borderWidth: 1,
+  textInput: {
+    backgroundColor: 'rgba(51, 65, 85, 0.8)',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     fontSize: 16,
     color: '#e2e8f0',
-    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  textInputError: {
+    borderColor: '#ef4444',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -143,9 +227,12 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    padding: 12,
+    backgroundColor: 'rgba(51, 65, 85, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
     alignItems: 'center',
   },
   cancelButtonText: {
@@ -158,8 +245,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  confirmGradient: {
-    padding: 12,
+  confirmButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
   },
   confirmButtonText: {
