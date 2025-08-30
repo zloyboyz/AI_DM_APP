@@ -122,6 +122,21 @@ export default function ChatScreen() {
               setMessages([]);
             }
           } else {
+            // No messages found in either local storage or Supabase
+            const noMessagesIndicator: ChatMessage = {
+              id: 'no-old-messages',
+              role: 'dm',
+              text: 'There are no old messages. Starting a fresh adventure!',
+              ts: Date.now(),
+            };
+            
+            setMessages([noMessagesIndicator]);
+            
+            // Save this indicator to local storage
+            if (sessionId) {
+              await appendChat(sessionId, noMessagesIndicator);
+            }
+          } else {
             setMessages(chatHistory);
           }
         } else {
@@ -129,7 +144,15 @@ export default function ChatScreen() {
         }
       } catch (error) {
         console.error('Error loading chat history:', error);
-        setMessages([]);
+        
+        // Show error message in chat instead of empty state
+        const errorMessage: ChatMessage = {
+          id: 'load-error',
+          role: 'dm',
+          text: 'Error loading chat history. Starting fresh.',
+          ts: Date.now(),
+        };
+        setMessages([errorMessage]);
       }
     };
 
