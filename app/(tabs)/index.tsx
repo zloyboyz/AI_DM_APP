@@ -133,7 +133,6 @@ export default function ChatScreen() {
             setMessages([noMessagesIndicator]);
             
             // Save this indicator to local storage
-            if (sessionId) {
               await appendChat(sessionId, noMessagesIndicator);
             }
           } else {
