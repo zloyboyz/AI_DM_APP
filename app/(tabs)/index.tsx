@@ -150,6 +150,8 @@ export default function ChatScreen() {
         };
         setMessages([errorMessage]);
       }
+    } finally {
+      // Cleanup if needed
     };
 
     loadChatHistory();
