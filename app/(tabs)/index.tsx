@@ -152,7 +152,7 @@ export default function ChatScreen() {
       }
     } finally {
       // Cleanup if needed
-    };
+    }
 
     loadChatHistory();
   }, [sessionId]);
