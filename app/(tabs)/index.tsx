@@ -119,20 +119,17 @@ export default function ChatScreen() {
               await appendChat(sessionId, systemMessage);
               await appendChat(sessionId, supabaseMessage);
             } else {
-              setMessages([]);
-            }
-          } else {
-            // No messages found in either local storage or Supabase
-            const noMessagesIndicator: ChatMessage = {
-              id: 'no-old-messages',
-              role: 'dm',
-              text: 'There are no old messages. Starting a fresh adventure!',
-              ts: Date.now(),
-            };
-            
-            setMessages([noMessagesIndicator]);
-            
-            // Save this indicator to local storage
+              // No messages found in either local storage or Supabase
+              const noMessagesIndicator: ChatMessage = {
+                id: 'no-old-messages',
+                role: 'dm',
+                text: 'There are no old messages. Starting a fresh adventure!',
+                ts: Date.now(),
+              };
+              
+              setMessages([noMessagesIndicator]);
+              
+              // Save this indicator to local storage
               await appendChat(sessionId, noMessagesIndicator);
             }
           } else {
