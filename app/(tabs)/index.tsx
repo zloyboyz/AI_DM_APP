@@ -149,10 +149,10 @@ export default function ChatScreen() {
           ts: Date.now(),
         };
         setMessages([errorMessage]);
+      } finally {
+        void 0;
       }
-    } finally {
-      void 0;
-    }
+    };
 
     loadChatHistory();
   }, [sessionId]);
