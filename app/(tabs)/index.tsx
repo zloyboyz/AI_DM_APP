@@ -151,7 +151,7 @@ export default function ChatScreen() {
         setMessages([errorMessage]);
       }
     } finally {
-      // Cleanup if needed
+      void 0;
     }
 
     loadChatHistory();
