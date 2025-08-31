@@ -91,7 +91,7 @@ export default function ChatScreen() {
                 lastSupabaseMessage = {
                   id: lastDmMessage.id,
                   session_id: lastDmMessage.session_id,
-                  message: lastDmMessage.message,
+                  message: lastDmMessage.content,
                 };
               }
             }

@@ -38,7 +38,7 @@ export async function getLastMessageForSession(sessionId: string): Promise<ChatH
 export interface DmMessageRecord {
   id: number;
   session_id: string;
-  message: string;
+  content: string;
   created_at: string;
 }
 
@@ -47,7 +47,7 @@ export async function getLastDmMessageForSession(sessionId: string): Promise<DmM
   try {
     const { data, error } = await supabase
       .from('dm_messages')
-      .select('id, session_id, message, created_at')
+      .select('id, session_id, content, created_at')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false })
       .limit(1)
