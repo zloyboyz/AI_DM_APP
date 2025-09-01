@@ -74,28 +74,6 @@ const asyncStorageDriver = {
   }
 };
 
-// Configure localforage based on platform
-// Only initialize localforage in client-side environments
-if (typeof window !== 'undefined') {
-  if (Platform.OS === 'web') {
-    // For web, use IndexedDB, WebSQL, or LocalStorage
-    localforage.setDriver([
-      localforage.LOCALSTORAGE,
-      localforage.INDEXEDDB,
-      localforage.WEBSQL
-    ]);
-  } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
-    // For native platforms, define and use AsyncStorage driver
-    localforage.defineDriver(asyncStorageDriver);
-    localforage.setDriver([
-      'asyncStorageWrapper',
-      localforage.INDEXEDDB,
-      localforage.WEBSQL,
-      localforage.LOCALSTORAGE
-    ]);
-  }
-}
-
 export type AudioRef = {
   path: string;           // "TestChat/<session>/<message>/narrator_01.mp3"
   public_url: string;     // from your n8n payload
@@ -112,20 +90,73 @@ export type ChatMessage = {
   ts: number;
 };
 
-const chatDB  = localforage.createInstance({ name: "aidm", storeName: "chats"  });
-const audioDB = localforage.createInstance({ name: "aidm", storeName: "audio"  });
-const metaDB  = localforage.createInstance({ name: "aidm", storeName: "meta"   });
-const sessionDB = localforage.createInstance({ name: "aidm", storeName: "session" });
+// Initialize storage asynchronously
+let storageInitialized = false;
+let initPromise: Promise<void> | null = null;
+
+async function initializeStorage(): Promise<void> {
+  if (storageInitialized) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    // Only initialize localforage in client-side environments
+    if (typeof window !== 'undefined') {
+      if (Platform.OS === 'web') {
+        // For web, use IndexedDB, WebSQL, or LocalStorage
+        await localforage.setDriver([
+          localforage.INDEXEDDB,
+          localforage.WEBSQL,
+          localforage.LOCALSTORAGE
+        ]);
+      } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        // For native platforms, define and use AsyncStorage driver
+        await localforage.defineDriver(asyncStorageDriver);
+        await localforage.setDriver([
+          'asyncStorageWrapper',
+          localforage.INDEXEDDB,
+          localforage.WEBSQL,
+          localforage.LOCALSTORAGE
+        ]);
+      }
+    }
+    storageInitialized = true;
+  })();
+
+  return initPromise;
+}
+
+// Create database instances as promises
+const chatDB = Promise.resolve().then(async () => {
+  await initializeStorage();
+  return localforage.createInstance({ name: "aidm", storeName: "chats" });
+});
+
+const audioDB = Promise.resolve().then(async () => {
+  await initializeStorage();
+  return localforage.createInstance({ name: "aidm", storeName: "audio" });
+});
+
+const metaDB = Promise.resolve().then(async () => {
+  await initializeStorage();
+  return localforage.createInstance({ name: "aidm", storeName: "meta" });
+});
+
+const sessionDB = Promise.resolve().then(async () => {
+  await initializeStorage();
+  return localforage.createInstance({ name: "aidm", storeName: "session" });
+});
 
 export { sessionDB };
 
 /** ---------- Chat (array of messages per session) ---------- */
 export async function loadChat(sessionId: string): Promise<ChatMessage[]> {
-  return (await chatDB.getItem<ChatMessage[]>(sessionId)) ?? [];
+  const db = await chatDB;
+  return (await db.getItem<ChatMessage[]>(sessionId)) ?? [];
 }
 
 export async function saveChat(sessionId: string, msgs: ChatMessage[]) {
-  await chatDB.setItem(sessionId, msgs);
+  const db = await chatDB;
+  await db.setItem(sessionId, msgs);
 }
 
 export async function appendChat(sessionId: string, msg: ChatMessage) {
@@ -135,7 +166,8 @@ export async function appendChat(sessionId: string, msg: ChatMessage) {
 }
 
 export async function clearChat(sessionId: string) {
-  await chatDB.removeItem(sessionId);
+  const db = await chatDB;
+  await db.removeItem(sessionId);
 }
 
 /** ---------- Audio cache ---------- */
@@ -147,21 +179,23 @@ function keyForAudio(sessionId: string, path: string) {
 
 export async function cacheAudioBlob(sessionId: string, a: AudioRef) {
   try {
+    const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
     const res  = await fetch(a.public_url, { cache: "no-store" });
     if (!res.ok) throw new Error(`fetch ${a.public_url} -> ${res.status}`);
     const blob = await res.blob();
-    await audioDB.setItem(keyForAudio(sessionId, a.path), blob);
+    await audioDbInstance.setItem(keyForAudio(sessionId, a.path), blob);
     // store last-used timestamp for cleanup
-    await metaDB.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
+    await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
   } catch (e) {
     console.warn("cacheAudioBlob failed:", e);
   }
 }
 
 export async function getPlayableUrl(sessionId: string, a: AudioRef): Promise<string> {
-  const blob = await audioDB.getItem<Blob>(keyForAudio(sessionId, a.path));
+  const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
+  const blob = await audioDbInstance.getItem<Blob>(keyForAudio(sessionId, a.path));
   if (blob) {
-    await metaDB.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
+    await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
     return URL.createObjectURL(blob); // remember to revoke when unmounting UI
   }
   return a.public_url;
@@ -169,13 +203,14 @@ export async function getPlayableUrl(sessionId: string, a: AudioRef): Promise<st
 
 /** ---------- Optional: TTL cleanup on startup ---------- */
 export async function vacuumOldAudio(now = Date.now()) {
+  const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
   const ttlMs = TTL_DAYS * 24 * 60 * 60 * 1000;
-  const keys = await audioDB.keys();
+  const keys = await audioDbInstance.keys();
   for (const k of keys) {
-    const ts = (await metaDB.getItem<number>(`${k}:ts`)) ?? now;
+    const ts = (await metaDbInstance.getItem<number>(`${k}:ts`)) ?? now;
     if (now - ts > ttlMs) {
-      await audioDB.removeItem(k);
-      await metaDB.removeItem(`${k}:ts`);
+      await audioDbInstance.removeItem(k);
+      await metaDbInstance.removeItem(`${k}:ts`);
     }
   }
 }
