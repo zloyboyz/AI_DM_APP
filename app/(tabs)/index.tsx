@@ -81,7 +81,7 @@ export default function ChatScreen() {
           // If no local chat history exists, check Supabase for previous messages
           if (chatHistory.length === 0) {
             // First check n8n_chat_histories table
-            }
+            const lastSupabaseMessage = await getLastDmMessageForSession(sessionId);
             
             if (lastSupabaseMessage) {
               // Convert Supabase message to ChatMessage format
@@ -315,6 +315,19 @@ export default function ChatScreen() {
 
             // Persist DM message and cache audio
             if (sessionId) {
+              await appendChat(sessionId, dmMessage);
+              
+              // Cache audio files
+              if (data.audio && data.audio.length > 0) {
+                data.audio.forEach(async (audioRef) => {
+                  try {
+                    await cacheAudioBlob(sessionId, audioRef);
+                  } catch (error) {
+                    console.warn('Failed to cache audio:', audioRef.path, error);
+                  }
+                });
+              }
+            }
           } else {
             // Non-JSON response, show success message
             const successMsg: ChatMessage = {
@@ -328,7 +341,7 @@ export default function ChatScreen() {
               await appendChat(sessionId, successMsg);
             }
           }
-      } catch (error) {
+        } catch (error) {
           console.error('Error sending voice message:', error);
           
           // Check if it's a webhook configuration error
