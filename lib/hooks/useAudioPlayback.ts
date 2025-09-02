@@ -55,10 +55,43 @@ export function useAudioPlayback() {
       if (typeof audioSource === 'string') {
         uri = audioSource;
       } else {
-        // It's an AudioRef, get the playable URL (cached or remote)
-        uri = await getPlayableUrl(sessionId!, audioSource);
-        if (uri.startsWith('blob:')) {
-          blobUrls.current.add(uri);
+        // It's an AudioRef, try to get the playable URL
+        try {
+          uri = await getPlayableUrl(sessionId!, audioSource);
+          if (uri.startsWith('blob:')) {
+            blobUrls.current.add(uri);
+          }
+        } catch (error) {
+          console.warn('Audio file not available:', audioSource.path);
+          // Skip this audio file and continue
+          setState(prev => {
+            if (prev.currentSequence.length > 0 && prev.currentIndex < prev.currentSequence.length - 1) {
+              // Try next file in sequence
+              const nextIndex = prev.currentIndex + 1;
+              const nextAudioSource = prev.currentSequence[nextIndex];
+              const nextAudioId = prev.currentSequence.length > 1 
+                ? `${prev.currentlyPlayingId}-${nextIndex}` 
+                : prev.currentlyPlayingId!;
+              
+              // Play next audio file
+              playSingleAudio(nextAudioSource, nextAudioId, sessionId);
+              
+              return {
+                ...prev,
+                currentIndex: nextIndex,
+              };
+            } else {
+              // No more files to play
+              return {
+                ...prev,
+                isPlaying: false,
+                currentlyPlayingId: null,
+                currentSequence: [],
+                currentIndex: 0,
+              };
+            }
+          });
+          return;
         }
       }
       

@@ -1,241 +1,208 @@
-// lib/storage.ts
-import localforage from "localforage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useState, useRef, useCallback } from 'react';
+import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
+import { getPlayableUrl, AudioRef } from '../storage';
 
-// Define custom AsyncStorage driver for localforage
-const asyncStorageDriver = {
-  _driver: 'asyncStorageWrapper',
-  _initStorage: function(options: any) {
-    return Promise.resolve();
-  },
-  clear: function(callback?: (err: any) => void) {
-    return AsyncStorage.clear().then(() => {
-      if (callback) callback(null);
-    }).catch(callback);
-  },
-  getItem: function(key: string, callback?: (err: any, value: any) => void) {
-    return AsyncStorage.getItem(key).then((result) => {
-      let value = null;
-      if (result !== null) {
+interface AudioPlaybackState {
+  isPlaying: boolean;
+  currentlyPlayingId: string | null;
+  currentSequence: string[];
+  currentIndex: number;
+}
+
+export function useAudioPlayback() {
+  const [state, setState] = useState<AudioPlaybackState>({
+    isPlaying: false,
+    currentlyPlayingId: null,
+    currentSequence: [],
+    currentIndex: 0,
+  });
+
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const blobUrls = useRef<Set<string>>(new Set());
+
+  const cleanup = useCallback(async () => {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.unloadAsync();
+      } catch (error) {
+        console.warn('Error unloading sound:', error);
+      }
+      soundRef.current = null;
+    }
+    
+    // Revoke any blob URLs we created
+    blobUrls.current.forEach(url => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    blobUrls.current.clear();
+    
+    setState(prev => ({
+      ...prev,
+      isPlaying: false,
+      currentlyPlayingId: null,
+      currentSequence: [],
+      currentIndex: 0,
+    }));
+  }, []);
+
+  const playSingleAudio = useCallback(async (audioSource: string | AudioRef, audioId: string, sessionId?: string) => {
+    try {
+      // Resolve the actual URI to play
+      let uri: string;
+      if (typeof audioSource === 'string') {
+        uri = audioSource;
+      } else {
+        // It's an AudioRef, get the playable URL (cached or remote)
         try {
-          value = JSON.parse(result);
-        } catch (e) {
-          value = result; // fallback to raw string if not JSON
+          uri = await getPlayableUrl(sessionId!, audioSource);
+        } catch (error) {
+          console.warn('Failed to get playable URL for audio:', error);
+          // Skip this audio file if we can't get a playable URL
+          setState(prev => ({
+            ...prev,
+            isPlaying: false,
+            currentlyPlayingId: null,
+            currentSequence: [],
+            currentIndex: 0,
+          }));
+          return;
+        }
+        
+        if (uri.startsWith('blob:')) {
+          blobUrls.current.add(uri);
         }
       }
-      if (callback) callback(null, value);
-      return value;
-    }).catch(callback);
-  },
-  iterate: function(iterator: (value: any, key: string, iterationNumber: number) => any, callback?: (err: any, result: any) => void) {
-    return AsyncStorage.getAllKeys().then((keys) => {
-      return Promise.all(keys.map((key, index) => 
-        AsyncStorage.getItem(key).then((value) => {
-          return iterator(value, key, index);
-        })
-      ));
-    }).then((result) => {
-      if (callback) callback(null, result);
-      return result;
-    }).catch(callback);
-  },
-  key: function(n: number, callback?: (err: any, key: string) => void) {
-    return AsyncStorage.getAllKeys().then((keys) => {
-      const key = keys[n] || null;
-      if (callback) callback(null, key);
-      return key;
-    }).catch(callback);
-  },
-  keys: function(callback?: (err: any, keys: string[]) => void) {
-    return AsyncStorage.getAllKeys().then((keys) => {
-      if (callback) callback(null, keys);
-      return keys;
-    }).catch(callback);
-  },
-  length: function(callback?: (err: any, numberOfKeys: number) => void) {
-    return AsyncStorage.getAllKeys().then((keys) => {
-      const length = keys.length;
-      if (callback) callback(null, length);
-      return length;
-    }).catch(callback);
-  },
-  removeItem: function(key: string, callback?: (err: any) => void) {
-    return AsyncStorage.removeItem(key).then(() => {
-      if (callback) callback(null);
-    }).catch(callback);
-  },
-  setItem: function(key: string, value: any, callback?: (err: any, value: any) => void) {
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-    return AsyncStorage.setItem(key, stringValue).then(() => {
-      if (callback) callback(null, value);
-      return value;
-    }).catch(callback);
-  }
-};
-
-export type AudioRef = {
-  path: string;           // "TestChat/<session>/<message>/narrator_01.mp3"
-  public_url: string;     // from your n8n payload
-  voice?: string;
-  mime?: string;
-  duration_ms?: number;
-};
-
-export type ChatMessage = {
-  id: string;             // messageId
-  role: "user" | "dm";
-  text: string;
-  audio?: AudioRef[];
-  ts: number;
-};
-
-// Initialize storage asynchronously
-let storageInitialized = false;
-let initPromise: Promise<void> | null = null;
-
-async function initializeStorage(): Promise<void> {
-  if (storageInitialized) return;
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    // Only initialize localforage in client-side environments
-    if (typeof window !== 'undefined') {
-      if (Platform.OS === 'web') {
-        // For web, use IndexedDB, WebSQL, or LocalStorage
-        await localforage.setDriver([
-          localforage.INDEXEDDB,
-          localforage.WEBSQL,
-          localforage.LOCALSTORAGE
-        ]);
-      } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        // For native platforms, define and use AsyncStorage driver
-        await localforage.defineDriver(asyncStorageDriver);
-        await localforage.setDriver([
-          'asyncStorageWrapper',
-          localforage.INDEXEDDB,
-          localforage.WEBSQL,
-          localforage.LOCALSTORAGE
-        ]);
+      
+      // Only unload the current sound if we're switching to a different one
+      if (soundRef.current) {
+        try {
+          await soundRef.current.unloadAsync();
+        } catch (error) {
+          console.warn('Error unloading previous sound:', error);
+        }
+        soundRef.current = null;
       }
+
+      let sound: Audio.Sound;
+      
+      // Create new sound instance each time
+      try {
+        const { sound: newSound } = await Audio.Sound.createAsync({ uri });
+        sound = newSound;
+      } catch (error) {
+        console.warn('Failed to create audio from URI:', uri, error);
+        // Skip this audio file if we can't create a sound from it
+        setState(prev => ({
+          ...prev,
+          isPlaying: false,
+          currentlyPlayingId: null,
+          currentSequence: [],
+          currentIndex: 0,
+        }));
+        return;
+      }
+      
+      sound = newSound;
+
+      soundRef.current = sound;
+
+      // Set up playback status update
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          if (status.didJustFinish) {
+            // Check if we're playing a sequence and have more files to play
+            setState(prev => {
+              if (prev.currentSequence.length > 0 && prev.currentIndex < prev.currentSequence.length - 1) {
+                // Play next file in sequence
+                const nextIndex = prev.currentIndex + 1;
+                const nextAudioSource = prev.currentSequence[nextIndex];
+                const nextAudioId = prev.currentSequence.length > 1 
+                  ? `${prev.currentlyPlayingId}-${nextIndex}` 
+                  : prev.currentlyPlayingId!;
+                
+                // Play next audio file
+                playSingleAudio(nextAudioSource, nextAudioId, sessionId);
+                
+                return {
+                  ...prev,
+                  currentIndex: nextIndex,
+                };
+              } else {
+                // Sequence finished or single file finished
+                setState(prevState => ({
+                  ...prevState,
+                  isPlaying: false,
+                  currentlyPlayingId: null,
+                  currentSequence: [],
+                  currentIndex: 0,
+                }));
+                return {
+                  ...prev,
+                  isPlaying: false,
+                  currentlyPlayingId: null,
+                  currentSequence: [],
+                  currentIndex: 0,
+                };
+              }
+            });
+          } else {
+            setState(prev => ({
+              ...prev,
+              isPlaying: status.isPlaying || false,
+            }));
+          }
+        }
+      });
+
+      await sound.playAsync();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      setState(prev => ({
+        ...prev,
+        isPlaying: false,
+        currentlyPlayingId: null,
+        currentSequence: [],
+        currentIndex: 0,
+      }));
     }
-    storageInitialized = true;
-  })();
+  }, [cleanup]);
 
-  return initPromise;
-}
+  const playAudio = useCallback(async (audioSources: string | AudioRef | (string | AudioRef)[], messageId: string, sessionId?: string) => {
+    try {
+      // Stop any currently playing audio before starting new sequence
+      await cleanup();
+      
+      const sources = Array.isArray(audioSources) ? audioSources : [audioSources];
+      
+      setState(prev => ({
+        ...prev,
+        currentlyPlayingId: messageId,
+        currentSequence: sources,
+        currentIndex: 0,
+        isPlaying: true,
+      }));
 
-// Create database instances as promises
-const chatDB = Promise.resolve().then(async () => {
-  await initializeStorage();
-  return localforage.createInstance({ name: "aidm", storeName: "chats" });
-});
-
-const audioDB = Promise.resolve().then(async () => {
-  await initializeStorage();
-  return localforage.createInstance({ name: "aidm", storeName: "audio" });
-});
-
-const metaDB = Promise.resolve().then(async () => {
-  await initializeStorage();
-  return localforage.createInstance({ name: "aidm", storeName: "meta" });
-});
-
-const sessionDB = Promise.resolve().then(async () => {
-  await initializeStorage();
-  return localforage.createInstance({ name: "aidm", storeName: "session" });
-});
-
-export { sessionDB };
-
-/** ---------- Chat (array of messages per session) ---------- */
-export async function loadChat(sessionId: string): Promise<ChatMessage[]> {
-  const db = await chatDB;
-  return (await db.getItem<ChatMessage[]>(sessionId)) ?? [];
-}
-
-export async function saveChat(sessionId: string, msgs: ChatMessage[]) {
-  const db = await chatDB;
-  await db.setItem(sessionId, msgs);
-}
-
-export async function appendChat(sessionId: string, msg: ChatMessage) {
-  const arr = await loadChat(sessionId);
-  arr.push(msg);
-  await saveChat(sessionId, arr);
-}
-
-export async function clearChat(sessionId: string) {
-  const db = await chatDB;
-  await db.removeItem(sessionId);
-}
-
-/** ---------- Audio cache ---------- */
-const TTL_DAYS = 14;
-
-function keyForAudio(sessionId: string, path: string) {
-  return `${sessionId}:${path}`;
-}
-
-export async function cacheAudioBlob(sessionId: string, a: AudioRef) {
-  try {
-    const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
-    const res = await fetch(a.public_url, { cache: "no-store" });
-    if (!res.ok) {
-      console.warn(`Failed to cache audio from ${a.public_url}: ${res.status} ${res.statusText}`);
-      return; // Don't throw, just skip caching
+      // Start playing the first audio file
+      const firstSource = sources[0];
+      const firstAudioId = sources.length > 1 ? `${messageId}-0` : messageId;
+      await playSingleAudio(firstSource, firstAudioId, sessionId);
+    } catch (error) {
+      console.error('Error starting audio playback:', error);
+      await cleanup();
     }
-    const blob = await res.blob();
-    await audioDbInstance.setItem(keyForAudio(sessionId, a.path), blob);
-    // store last-used timestamp for cleanup
-    await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
-  } catch (e) {
-    console.warn("cacheAudioBlob failed for", a.public_url, ":", e);
-  }
-}
+  }, [playSingleAudio, cleanup]);
 
-export async function getPlayableUrl(sessionId: string, a: AudioRef): Promise<string> {
-  try {
-    const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
-    const blob = await audioDbInstance.getItem<Blob>(keyForAudio(sessionId, a.path));
-    if (blob) {
-      await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
-      return URL.createObjectURL(blob); // remember to revoke when unmounting UI
-    }
-  } catch (e) {
-    console.warn("Failed to get cached audio for", a.path, ":", e);
-  }
-  
-  // Fallback: return the original public_url even if it might not work
-  // This allows the audio player to attempt playback and show appropriate error
-  return a.public_url;
-}
+  const stopAudio = useCallback(async () => {
+    await cleanup();
+  }, [cleanup]);
 
-/** ---------- Optional: TTL cleanup on startup ---------- */
-export async function vacuumOldAudio(now = Date.now()) {
-  const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
-  const ttlMs = TTL_DAYS * 24 * 60 * 60 * 1000;
-  const keys = await audioDbInstance.keys();
-  for (const k of keys) {
-    const ts = (await metaDbInstance.getItem<number>(`${k}:ts`)) ?? now;
-    if (now - ts > ttlMs) {
-      await audioDbInstance.removeItem(k);
-      await metaDbInstance.removeItem(`${k}:ts`);
-    }
-  }
-}
-
-/** ---------- Remember last sessionId locally ---------- */
-const LAST_SESSION_KEY = "aidm:lastSessionId";
-export function rememberSession(id: string) {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    localStorage.setItem(LAST_SESSION_KEY, id);
-  }
-}
-
-export function readLastSession(): string | null {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    return localStorage.getItem(LAST_SESSION_KEY);
-  }
-  return null;
+  return {
+    isPlaying: state.isPlaying,
+    currentlyPlayingId: state.currentlyPlayingId,
+    playAudio,
+    stopAudio,
+  };
 }
