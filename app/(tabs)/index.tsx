@@ -356,7 +356,7 @@ export default function ChatScreen() {
               await appendChat(sessionId, successMsg);
             }
           }
-        } catch (error) {
+      } catch (error) {
           console.error('Error sending voice message:', error);
           
           // Check if it's a webhook configuration error
