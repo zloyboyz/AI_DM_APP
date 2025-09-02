@@ -81,19 +81,6 @@ export default function ChatScreen() {
           // If no local chat history exists, check Supabase for previous messages
           if (chatHistory.length === 0) {
             // First check n8n_chat_histories table
-            let lastSupabaseMessage = await getLastMessageForSession(sessionId);
-            
-            // If no message found, check dm_messages table
-            if (!lastSupabaseMessage) {
-              const lastDmMessage = await getLastDmMessageForSession(sessionId);
-              if (lastDmMessage) {
-                // Convert dm_messages format to chat history format
-                lastSupabaseMessage = {
-                  id: lastDmMessage.id,
-                  session_id: lastDmMessage.session_id,
-                  message: lastDmMessage.content,
-                };
-              }
             }
             
             if (lastSupabaseMessage) {
@@ -328,21 +315,6 @@ export default function ChatScreen() {
 
             // Persist DM message and cache audio
             if (sessionId) {
-              await appendChat(sessionId, dmMessage);
-              
-              if (data.audio && data.audio.length > 0) {
-                for (const audioRef of data.audio) {
-                  try {
-                    if (audioRef.public_url) {
-                      const response = await fetch(audioRef.public_url);
-                      const blob = await response.blob();
-                    }
-                  } catch (error) {
-                    console.warn('Failed to cache audio:', audioRef.path, error);
-                  }
-                }
-              }
-            }
           } else {
             // Non-JSON response, show success message
             const successMsg: ChatMessage = {

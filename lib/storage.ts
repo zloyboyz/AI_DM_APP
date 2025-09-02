@@ -164,7 +164,29 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
 
   // If we have a public URL, use it directly
   if (audioRef.public_url) {
-    return audioRef.public_url;
+    try {
+      // Fetch and cache the audio
+      const response = await fetch(audioRef.public_url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      
+      // Cache the blob in localforage
+      const localCacheKey = `audio_${sessionId}_${audioRef.path}`;
+      await localforage.setItem(localCacheKey, blob);
+      
+      // Create and cache blob URL
+      const blobUrl = URL.createObjectURL(blob);
+      audioCache.set(cacheKey, blobUrl);
+      
+      return blobUrl;
+    } catch (error) {
+      console.error('Error fetching and caching audio:', error);
+      // Fallback to direct URL if caching fails
+      return audioRef.public_url;
+    }
   }
 
   // If no public URL and no cache, throw error
