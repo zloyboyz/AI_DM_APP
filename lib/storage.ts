@@ -184,8 +184,8 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
       return blobUrl;
     } catch (error) {
       console.error('Error fetching and caching audio:', error);
-      // Fallback to direct URL if caching fails
-      return audioRef.public_url;
+      // Re-throw the error instead of returning invalid URL
+      throw error;
     }
   }
 
