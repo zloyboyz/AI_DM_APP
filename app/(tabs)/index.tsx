@@ -336,8 +336,19 @@ export default function ChatScreen() {
                     if (audioRef.public_url) {
                       const response = await fetch(audioRef.public_url);
                       const blob = await response.blob();
+                    }
                   } catch (error) {
                     console.warn('Failed to cache audio:', audioRef.path, error);
+                  }
+                }
+              }
+            }
+          } else {
+            // Non-JSON response, show success message
+            const successMsg: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              role: 'dm',
+              text: 'Voice message sent successfully!',
               ts: Date.now(),
             };
             setMessages(prev => [...prev, successMsg]);
