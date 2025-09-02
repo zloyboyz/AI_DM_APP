@@ -221,8 +221,12 @@ export default function ChatScreen() {
         
         // Cache audio files
         if (data.audio && data.audio.length > 0) {
-          data.audio.forEach(audioRef => {
-            cacheAudioBlob(sessionId, audioRef);
+          data.audio.forEach(async (audioRef) => {
+            try {
+              await cacheAudioBlob(sessionId, audioRef);
+            } catch (error) {
+              console.warn('Failed to cache audio:', audioRef.path, error);
+            }
           });
         }
       }
