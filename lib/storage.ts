@@ -1,208 +1,92 @@
-import { useState, useRef, useCallback } from 'react';
-import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { getPlayableUrl, AudioRef } from '../storage';
 
-interface AudioPlaybackState {
-  isPlaying: boolean;
-  currentlyPlayingId: string | null;
-  currentSequence: string[];
-  currentIndex: number;
+export interface AudioRef {
+  path: string;
+  public_url?: string;
 }
 
-export function useAudioPlayback() {
-  const [state, setState] = useState<AudioPlaybackState>({
-    isPlaying: false,
-    currentlyPlayingId: null,
-    currentSequence: [],
-    currentIndex: 0,
+// Storage utility functions
+export const storage = {
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return await AsyncStorage.getItem(key);
+    }
+  },
+
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await AsyncStorage.setItem(key, value);
+    }
+  },
+
+  async removeItem(key: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      await AsyncStorage.removeItem(key);
+    }
+  }
+};
+
+// Secure storage for sensitive data
+export const secureStorage = {
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
+  },
+
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+
+  async removeItem(key: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
+  }
+};
+
+// Audio cache for blob URLs
+const audioCache = new Map<string, string>();
+
+export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Promise<string> {
+  // If we have a public URL, use it directly
+  if (audioRef.public_url) {
+    return audioRef.public_url;
+  }
+
+  // Check if we have a cached blob URL
+  const cacheKey = `${sessionId}-${audioRef.path}`;
+  const cachedUrl = audioCache.get(cacheKey);
+  if (cachedUrl) {
+    return cachedUrl;
+  }
+
+  // If no public URL and no cache, throw error
+  throw new Error(`Audio file not available: ${audioRef.path}`);
+}
+
+export function clearAudioCache(): void {
+  // Revoke all blob URLs to free memory
+  audioCache.forEach(url => {
+    if (url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
   });
-
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const blobUrls = useRef<Set<string>>(new Set());
-
-  const cleanup = useCallback(async () => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.unloadAsync();
-      } catch (error) {
-        console.warn('Error unloading sound:', error);
-      }
-      soundRef.current = null;
-    }
-    
-    // Revoke any blob URLs we created
-    blobUrls.current.forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
-    blobUrls.current.clear();
-    
-    setState(prev => ({
-      ...prev,
-      isPlaying: false,
-      currentlyPlayingId: null,
-      currentSequence: [],
-      currentIndex: 0,
-    }));
-  }, []);
-
-  const playSingleAudio = useCallback(async (audioSource: string | AudioRef, audioId: string, sessionId?: string) => {
-    try {
-      // Resolve the actual URI to play
-      let uri: string;
-      if (typeof audioSource === 'string') {
-        uri = audioSource;
-      } else {
-        // It's an AudioRef, get the playable URL (cached or remote)
-        try {
-          uri = await getPlayableUrl(sessionId!, audioSource);
-        } catch (error) {
-          console.warn('Failed to get playable URL for audio:', error);
-          // Skip this audio file if we can't get a playable URL
-          setState(prev => ({
-            ...prev,
-            isPlaying: false,
-            currentlyPlayingId: null,
-            currentSequence: [],
-            currentIndex: 0,
-          }));
-          return;
-        }
-        
-        if (uri.startsWith('blob:')) {
-          blobUrls.current.add(uri);
-        }
-      }
-      
-      // Only unload the current sound if we're switching to a different one
-      if (soundRef.current) {
-        try {
-          await soundRef.current.unloadAsync();
-        } catch (error) {
-          console.warn('Error unloading previous sound:', error);
-        }
-        soundRef.current = null;
-      }
-
-      let sound: Audio.Sound;
-      
-      // Create new sound instance each time
-      try {
-        const { sound: newSound } = await Audio.Sound.createAsync({ uri });
-        sound = newSound;
-      } catch (error) {
-        console.warn('Failed to create audio from URI:', uri, error);
-        // Skip this audio file if we can't create a sound from it
-        setState(prev => ({
-          ...prev,
-          isPlaying: false,
-          currentlyPlayingId: null,
-          currentSequence: [],
-          currentIndex: 0,
-        }));
-        return;
-      }
-      
-      sound = newSound;
-
-      soundRef.current = sound;
-
-      // Set up playback status update
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          if (status.didJustFinish) {
-            // Check if we're playing a sequence and have more files to play
-            setState(prev => {
-              if (prev.currentSequence.length > 0 && prev.currentIndex < prev.currentSequence.length - 1) {
-                // Play next file in sequence
-                const nextIndex = prev.currentIndex + 1;
-                const nextAudioSource = prev.currentSequence[nextIndex];
-                const nextAudioId = prev.currentSequence.length > 1 
-                  ? `${prev.currentlyPlayingId}-${nextIndex}` 
-                  : prev.currentlyPlayingId!;
-                
-                // Play next audio file
-                playSingleAudio(nextAudioSource, nextAudioId, sessionId);
-                
-                return {
-                  ...prev,
-                  currentIndex: nextIndex,
-                };
-              } else {
-                // Sequence finished or single file finished
-                setState(prevState => ({
-                  ...prevState,
-                  isPlaying: false,
-                  currentlyPlayingId: null,
-                  currentSequence: [],
-                  currentIndex: 0,
-                }));
-                return {
-                  ...prev,
-                  isPlaying: false,
-                  currentlyPlayingId: null,
-                  currentSequence: [],
-                  currentIndex: 0,
-                };
-              }
-            });
-          } else {
-            setState(prev => ({
-              ...prev,
-              isPlaying: status.isPlaying || false,
-            }));
-          }
-        }
-      });
-
-      await sound.playAsync();
-    } catch (error) {
-      console.error('Error playing audio:', error);
-      setState(prev => ({
-        ...prev,
-        isPlaying: false,
-        currentlyPlayingId: null,
-        currentSequence: [],
-        currentIndex: 0,
-      }));
-    }
-  }, [cleanup]);
-
-  const playAudio = useCallback(async (audioSources: string | AudioRef | (string | AudioRef)[], messageId: string, sessionId?: string) => {
-    try {
-      // Stop any currently playing audio before starting new sequence
-      await cleanup();
-      
-      const sources = Array.isArray(audioSources) ? audioSources : [audioSources];
-      
-      setState(prev => ({
-        ...prev,
-        currentlyPlayingId: messageId,
-        currentSequence: sources,
-        currentIndex: 0,
-        isPlaying: true,
-      }));
-
-      // Start playing the first audio file
-      const firstSource = sources[0];
-      const firstAudioId = sources.length > 1 ? `${messageId}-0` : messageId;
-      await playSingleAudio(firstSource, firstAudioId, sessionId);
-    } catch (error) {
-      console.error('Error starting audio playback:', error);
-      await cleanup();
-    }
-  }, [playSingleAudio, cleanup]);
-
-  const stopAudio = useCallback(async () => {
-    await cleanup();
-  }, [cleanup]);
-
-  return {
-    isPlaying: state.isPlaying,
-    currentlyPlayingId: state.currentlyPlayingId,
-    playAudio,
-    stopAudio,
-  };
+  audioCache.clear();
 }
