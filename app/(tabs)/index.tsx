@@ -331,22 +331,34 @@ export default function ChatScreen() {
               await appendChat(sessionId, dmMessage);
               
               if (data.audio && data.audio.length > 0) {
-                data.audio.forEach(audioRef => {
-                  cacheAudioBlob(sessionId, audioRef);
-                });
+                for (const audioRef of data.audio) {
+                  try {
+                    if (audioRef.public_url) {
+                      const response = await fetch(audioRef.public_url);
+                      const blob = await response.blob();
+                      await cacheAudioBlob(sessionId, audioRef, blob);
+                    }
+                  } catch (error) {
+                    console.warn('Failed to cache audio:', audioRef.path, error);
+                  }
+                }
               }
             }
 
           } else {
             const successMsg: ChatMessage = {
               id: (Date.now() + 1).toString(),
-              role: 'dm',
+              for (const audioRef of data.audio) {
               text: text || 'Voice message sent successfully.',
-              ts: Date.now(),
+                  if (audioRef.public_url) {
+                    const response = await fetch(audioRef.public_url);
+                    const blob = await response.blob();
+                    await cacheAudioBlob(sessionId, audioRef, blob);
+                  }
             };
             setMessages(prev => [...prev, successMsg]);
             if (sessionId) {
-              await appendChat(sessionId, successMsg);
+              }
             }
           }
         } catch (error) {
