@@ -341,7 +341,6 @@ export default function ChatScreen() {
                     console.warn('Failed to cache audio:', audioRef.path, error);
                   }
                 }
-                }
               }
             }
           } else {
