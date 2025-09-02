@@ -380,30 +380,6 @@ export default function ChatScreen() {
         } finally {
           setIsLoading(false);
         }
-        } catch (error) {
-          console.error('Error sending voice message:', error);
-          
-          // Check if it's a webhook configuration error
-          const errorText = error instanceof Error ? error.message : String(error);
-          let errorText2 = 'Failed to send voice message. Please try again.';
-          
-          if (errorText.includes('404') && errorText.includes('webhook')) {
-            errorText2 = 'The AI Dungeon Master is currently offline. The webhook service needs to be activated.';
-          }
-          
-          const errorMessage: ChatMessage = {
-            id: (Date.now() + 2).toString(),
-            role: 'dm',
-            text: errorText2,
-            ts: Date.now(),
-          };
-          setMessages(prev => [...prev, errorMessage]);
-          if (sessionId) {
-            await appendChat(sessionId, errorMessage);
-          }
-        } finally {
-          setIsLoading(false);
-        }
       }
     } else {
       // Start recording
