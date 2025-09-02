@@ -350,15 +350,13 @@ export default function ChatScreen() {
               id: (Date.now() + 1).toString(),
               for (const audioRef of data.audio) {
               text: text || 'Voice message sent successfully.',
-                  if (audioRef.public_url) {
-                    const response = await fetch(audioRef.public_url);
-                    const blob = await response.blob();
-                    await cacheAudioBlob(sessionId, audioRef, blob);
-                  }
+              role: 'dm',
+              text: text || 'Voice message sent successfully.',
+              ts: Date.now(),
             };
             setMessages(prev => [...prev, successMsg]);
             if (sessionId) {
-              }
+              await appendChat(sessionId, successMsg);
             }
           }
         } catch (error) {
