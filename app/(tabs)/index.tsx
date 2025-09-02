@@ -348,8 +348,6 @@ export default function ChatScreen() {
           } else {
             const successMsg: ChatMessage = {
               id: (Date.now() + 1).toString(),
-              for (const audioRef of data.audio) {
-              text: text || 'Voice message sent successfully.',
               role: 'dm',
               text: text || 'Voice message sent successfully.',
               ts: Date.now(),
