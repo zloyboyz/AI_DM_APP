@@ -203,17 +203,6 @@ export default function ChatScreen() {
       // Persist DM message
       if (sessionId) {
         await appendChat(sessionId, dmMessage);
-        
-        // Cache audio files
-        if (data.audio && data.audio.length > 0) {
-          data.audio.forEach(async (audioRef) => {
-            try {
-              await cacheAudioBlob(sessionId, audioRef);
-            } catch (error) {
-              console.warn('Failed to cache audio:', audioRef.path, error);
-            }
-          });
-        }
       }
 
     } catch (err) {
@@ -314,17 +303,6 @@ export default function ChatScreen() {
             // Persist DM message and cache audio
             if (sessionId) {
               await appendChat(sessionId, dmMessage);
-              
-              // Cache audio files
-              if (data.audio && data.audio.length > 0) {
-                data.audio.forEach(async (audioRef) => {
-                  try {
-                    await cacheAudioBlob(sessionId, audioRef);
-                  } catch (error) {
-                    console.warn('Failed to cache audio:', audioRef.path, error);
-                  }
-                });
-              }
             }
           } else {
             // Non-JSON response, show success message
