@@ -180,24 +180,34 @@ function keyForAudio(sessionId: string, path: string) {
 export async function cacheAudioBlob(sessionId: string, a: AudioRef) {
   try {
     const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
-    const res  = await fetch(a.public_url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`fetch ${a.public_url} -> ${res.status}`);
+    const res = await fetch(a.public_url, { cache: "no-store" });
+    if (!res.ok) {
+      console.warn(`Failed to cache audio from ${a.public_url}: ${res.status} ${res.statusText}`);
+      return; // Don't throw, just skip caching
+    }
     const blob = await res.blob();
     await audioDbInstance.setItem(keyForAudio(sessionId, a.path), blob);
     // store last-used timestamp for cleanup
     await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
   } catch (e) {
-    console.warn("cacheAudioBlob failed:", e);
+    console.warn("cacheAudioBlob failed for", a.public_url, ":", e);
   }
 }
 
 export async function getPlayableUrl(sessionId: string, a: AudioRef): Promise<string> {
-  const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
-  const blob = await audioDbInstance.getItem<Blob>(keyForAudio(sessionId, a.path));
-  if (blob) {
-    await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
-    return URL.createObjectURL(blob); // remember to revoke when unmounting UI
+  try {
+    const [audioDbInstance, metaDbInstance] = await Promise.all([audioDB, metaDB]);
+    const blob = await audioDbInstance.getItem<Blob>(keyForAudio(sessionId, a.path));
+    if (blob) {
+      await metaDbInstance.setItem(`${keyForAudio(sessionId, a.path)}:ts`, Date.now());
+      return URL.createObjectURL(blob); // remember to revoke when unmounting UI
+    }
+  } catch (e) {
+    console.warn("Failed to get cached audio for", a.path, ":", e);
   }
+  
+  // Fallback: return the original public_url even if it might not work
+  // This allows the audio player to attempt playback and show appropriate error
   return a.public_url;
 }
 
