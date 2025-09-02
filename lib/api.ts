@@ -1,7 +1,7 @@
 import { getSessionId } from './session';
 
 export async function postJSON<T = any>(url: string, body: Record<string, any>): Promise<T> {
-  const sessionId = getSessionId();
+  const sessionId = await getSessionId();
   const payload = { ...body, sessionId }; // always send it if set
 
   const res = await fetch(url, {
