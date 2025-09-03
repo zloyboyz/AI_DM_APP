@@ -165,7 +165,7 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     try {
-      const messageId = globalThis.crypto?.randomUUID?.() ?? String(Date.now());
+      const messageId = Math.random().toString(36).substring(2, 6);
 
       const data = await postJSON<DmResponse>(WEBHOOK_URL, {
         messageId,
@@ -256,7 +256,7 @@ export default function ChatScreen() {
         setIsLoading(true);
         try {
           const currentSessionId = sessionId;
-          const messageId = globalThis.crypto?.randomUUID?.() ?? String(Date.now());
+          const messageId = Math.random().toString(36).substring(2, 6);
           const headers: Record<string, string> = { 'User-Agent': 'Expo-Mobile-App/1.0' };
           const form = new FormData();
 
