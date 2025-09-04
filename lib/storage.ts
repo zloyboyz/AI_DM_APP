@@ -71,7 +71,6 @@ export const secureStorage = {
 };
 
 // Audio cache for blob URLs
-const audioCache = new Map<string, string>();
 
 // Chat storage functions
 export async function loadChat(sessionId: string): Promise<ChatMessage[]> {
@@ -108,7 +107,6 @@ export async function cacheAudioBlob(sessionId: string, audioRef: AudioRef, blob
     await localforage.setItem(cacheKey, blob);
     
     const blobUrl = URL.createObjectURL(blob);
-    audioCache.set(`${sessionId}-${audioRef.path}`, blobUrl);
     
     return blobUrl;
   } catch (error) {
@@ -142,20 +140,12 @@ export async function vacuumOldAudio(): Promise<void> {
 }
 
 export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Promise<string> {
-  // First check if we have a cached blob URL
-  const cacheKey = `${sessionId}-${audioRef.path}`;
-  const cachedUrl = audioCache.get(cacheKey);
-  if (cachedUrl) {
-    return cachedUrl;
-  }
-
   // Check localforage for cached audio blob
   try {
     const localCacheKey = `audio_${sessionId}_${audioRef.path}`;
     const cachedBlob = await localforage.getItem<Blob>(localCacheKey);
     if (cachedBlob) {
       const blobUrl = URL.createObjectURL(cachedBlob);
-      audioCache.set(cacheKey, blobUrl);
       return blobUrl;
     }
   } catch (error) {
@@ -179,7 +169,6 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
       
       // Create and cache blob URL
       const blobUrl = URL.createObjectURL(blob);
-      audioCache.set(cacheKey, blobUrl);
       
       return blobUrl;
     } catch (error) {
@@ -194,11 +183,6 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
 }
 
 export function clearAudioCache(): void {
-  // Revoke all blob URLs to free memory
-  audioCache.forEach(url => {
-    if (url.startsWith('blob:')) {
-      URL.revokeObjectURL(url);
-    }
-  });
-  audioCache.clear();
+  // Note: Individual blob URLs are now managed by the audio playback hook
+  // This function is kept for backward compatibility but no longer needed
 }
