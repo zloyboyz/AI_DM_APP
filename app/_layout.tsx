@@ -3,9 +3,8 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
-import { useFrameworkReady } from '../lib/hooks/useFrameworkReady';
-import { initStorage } from '../lib/storage'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { initStorage } from '@/lib/storage';
 
 // Keep the splash screen up until the first layout. No top-level await.
 if (Platform.OS !== 'web') {
@@ -14,32 +13,23 @@ if (Platform.OS !== 'web') {
 
 export default function RootLayout() {
   // Initialize audio/fonts/whatever your hook sets up.
-  useFrameworkReady();
+  const ready = useFrameworkReady();
   
-  const [storageReady, setStorageReady] = useState(false);
+  useEffect(() => {
+    initStorage();
+  }, []);
 
   useEffect(() => {
-    initStorage().then(() => setStorageReady(true));
-  }, []);
-
-  const onLayoutRootView = useCallback(() => {
-    if (Platform.OS !== 'web') {
+    if (ready && Platform.OS !== 'web') {
       void SplashScreen.hideAsync();
     }
-  }, []);
-
-  // Don't render until storage is ready
-  if (!storageReady) {
-    return null;
-  }
+  }, [ready]);
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </View>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="+not-found" />
+    </Stack>
   );
 }
