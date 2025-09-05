@@ -1,4 +1,3 @@
-// lib/storage.ts
 export type KVStore = {
   getItem<T = unknown>(key: string): Promise<T | null>;
   setItem<T = unknown>(key: string, value: T): Promise<T>;
@@ -16,7 +15,3 @@ export type StorageAPI = {
   /** returns a named store after init is complete */
   getStore(name: string): Promise<KVStore>;
 };
-
-// NOTE: The actual implementation is selected by Metro via platform files:
-export * from './storage.web';   // resolved on web
-// export * from './storage.native'; // resolved on iOS/Android

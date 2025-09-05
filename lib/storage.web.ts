@@ -1,6 +1,6 @@
 // lib/storage.web.ts
 import localforage from 'localforage';
-import type { KVStore, StorageAPI } from './storage';
+import type { KVStore, StorageAPI } from './storage.types';
 
 const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 

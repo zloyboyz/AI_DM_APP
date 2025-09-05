@@ -1,7 +1,7 @@
 // lib/storage.native.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import type { KVStore, StorageAPI } from './storage';
+import type { KVStore, StorageAPI } from './storage.types';
 
 let ready: Promise<void> | null = null;
 const stores: Record<string, KVStore> = {};
