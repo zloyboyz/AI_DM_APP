@@ -174,7 +174,6 @@ export const storage = {
 
 // Secure storage for sensitive data (keeping existing implementation)
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 
 export const secureStorage = {
   async getItem(key: string): Promise<string | null> {
