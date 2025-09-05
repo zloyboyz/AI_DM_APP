@@ -374,11 +374,15 @@ export default function ChatScreen() {
   const handlePlayMultipleAudio = async (messageId: string, audioRefs: AudioRef[]) => {
     playClickSound();
     
+    console.log('handlePlayMultipleAudio called:', { messageId, currentlyPlayingId, isPlaying });
+    
     if (currentlyPlayingId === messageId && isPlaying) {
       // Stop if currently playing this message
+      console.log('Stopping currently playing audio');
       await stopAudio();
     } else {
       // Play all audio files in sequence  
+      console.log('Starting audio playback sequence');
       await playAudio(audioRefs, messageId, sessionId || undefined);
     }
   };

@@ -27,6 +27,7 @@ export function useAudioPlayback() {
   const cleanup = useCallback(async () => {
     if (soundRef.current) {
       try {
+        await soundRef.current.stopAsync();
         await soundRef.current.unloadAsync();
       } catch (error) {
         console.warn('Error unloading sound:', error);
@@ -206,6 +207,7 @@ export function useAudioPlayback() {
       // Only unload the current sound if we're switching to a different one
       if (soundRef.current) {
         try {
+          await soundRef.current.stopAsync();
           await soundRef.current.unloadAsync();
         } catch (error) {
           console.warn('Error unloading previous sound:', error);
@@ -223,8 +225,10 @@ export function useAudioPlayback() {
 
       // Set up playback status update
       sound.setOnPlaybackStatusUpdate((status) => {
+        console.log('Playback status:', status);
         if (status.isLoaded) {
           if (status.didJustFinish) {
+            console.log('Audio finished playing');
             // Check if we're playing a sequence and have more files to play
             setState(prev => {
               if (prev.currentSequence.length > 0 && prev.currentIndex < prev.currentSequence.length - 1) {
@@ -261,6 +265,7 @@ export function useAudioPlayback() {
               }
             });
           } else {
+            console.log('Audio playing status:', status.isPlaying);
             setState(prev => ({
               ...prev,
               isPlaying: status.isPlaying || false,
@@ -269,6 +274,7 @@ export function useAudioPlayback() {
         }
       });
 
+      console.log('Starting audio playback for:', uriToPlay);
       await sound.playAsync();
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -284,6 +290,7 @@ export function useAudioPlayback() {
 
   const playAudio = useCallback(async (audioSources: string | AudioRef | (string | AudioRef)[], messageId: string, sessionId?: string) => {
     try {
+      console.log('playAudio called for messageId:', messageId);
       // Stop any currently playing audio before starting new sequence
       await cleanup();
       
@@ -300,6 +307,7 @@ export function useAudioPlayback() {
       // Start playing the first audio file
       const firstSource = sources[0];
       const firstAudioId = sources.length > 1 ? `${messageId}-0` : messageId;
+      console.log('Starting first audio source:', firstSource);
       await playSingleAudio(firstSource, firstAudioId, sessionId);
     } catch (error) {
       console.error('Error starting audio playback:', error);
@@ -308,6 +316,7 @@ export function useAudioPlayback() {
   }, [playSingleAudio, cleanup]);
 
   const stopAudio = useCallback(async () => {
+    console.log('stopAudio called');
     await cleanup();
   }, [cleanup]);
 
