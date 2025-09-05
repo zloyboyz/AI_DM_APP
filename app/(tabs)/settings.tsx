@@ -16,8 +16,8 @@ import { useAudioManager } from '../../lib/hooks/useAudioManager';
 import { VolumeSlider } from '../../lib/components/VolumeSlider';
 import { AudioToggle } from '../../lib/components/AudioToggle';
 import { useSessionId } from '../../lib/useSessionId';
-import { clearChat } from '../../lib/storage';
-import localforage from 'localforage';
+import { clearChat } from '../../lib/chatStorage';
+import { clearAllAudioCache } from '../../lib/audioCache';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -89,12 +89,7 @@ export default function SettingsScreen() {
           style: 'destructive', 
           onPress: async () => {
             try {
-              // Clear audio cache
-              const audioDB = await localforage.createInstance({ name: "aidm", storeName: "audio" });
-              const metaDB = await localforage.createInstance({ name: "aidm", storeName: "meta" });
-              
-              await audioDB.clear();
-              await metaDB.clear();
+              await clearAllAudioCache();
               
               Alert.alert('Success', 'Voice history has been deleted.');
             } catch (error) {

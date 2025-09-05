@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
-import { getPlayableUrl, AudioRef } from '../storage';
+import { getPlayableUrl, AudioRef } from '../audioCache';
 
 interface AudioPlaybackState {
   isPlaying: boolean;

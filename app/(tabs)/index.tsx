@@ -19,14 +19,8 @@ import { useAudioPlayback } from '../../lib/hooks/useAudioPlayback';
 import { useSessionId } from '../../lib/useSessionId';
 import { postJSON } from '../../lib/api';
 import { getLastMessageForSession, getLastDmMessageForSession } from '../../lib/supabase';
-import { 
-  loadChat, 
-  appendChat, 
-  vacuumOldAudio, 
-  cacheAudioBlob, 
-  ChatMessage, 
-  AudioRef 
-} from '../../lib/storage';
+import { loadChat, appendChat, ChatMessage } from '../../lib/chatStorage';
+import { vacuumOldAudio, cacheAudioBlob, getPlayableUrl, AudioRef } from '../../lib/audioCache';
 import Constants from 'expo-constants';
 
 interface DmResponse {
