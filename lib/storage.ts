@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import localforage from 'localforage';
-import AsyncStorageDriver from 'localforage-asyncstorage-driver';
+import AsyncStorageDriver from 'localforage-asyncstorage';
 
 export interface AudioRef {
   path: string;
