@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import localforage from 'localforage';
+import AsyncStorageDriver from 'localforage-asyncstorage';
 
 export interface AudioRef {
   path: string;
@@ -14,6 +15,12 @@ export interface ChatMessage {
   isUser: boolean;
   timestamp: number;
   audioRefs?: AudioRef[];
+}
+
+// Configure localforage for React Native
+if (Platform.OS !== 'web') {
+  localforage.defineDriver(AsyncStorageDriver);
+  localforage.setDriver('asyncStorageWrapper');
 }
 
 // Storage utility functions
