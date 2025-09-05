@@ -1,5 +1,7 @@
 // lib/storage.ts
 import localforage from 'localforage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 type KVStore = {
   getItem<T = unknown>(key: string): Promise<T | null>;
@@ -11,7 +13,65 @@ type KVStore = {
 };
 
 const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-const drivers = [localforage.INDEXEDDB, localforage.LOCALSTORAGE];
+const webDrivers = [localforage.INDEXEDDB, localforage.LOCALSTORAGE];
+
+// Define AsyncStorage driver for React Native
+const ASYNCSTORAGE_DRIVER = 'asyncStorageWrapper';
+
+const asyncStorageDriver = {
+  _driver: ASYNCSTORAGE_DRIVER,
+  _initStorage: function() {
+    return Promise.resolve();
+  },
+  _support: function() {
+    return typeof AsyncStorage !== 'undefined';
+  },
+  _setItem: function(key: string, value: any) {
+    return AsyncStorage.setItem(key, JSON.stringify(value));
+  },
+  _getItem: function(key: string) {
+    return AsyncStorage.getItem(key).then(value => {
+      if (value === null) return null;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    });
+  },
+  _removeItem: function(key: string) {
+    return AsyncStorage.removeItem(key);
+  },
+  _clear: function() {
+    return AsyncStorage.clear();
+  },
+  _key: function(n: number) {
+    return AsyncStorage.getAllKeys().then(keys => keys[n] || null);
+  },
+  _keys: function() {
+    return AsyncStorage.getAllKeys();
+  },
+  _length: function() {
+    return AsyncStorage.getAllKeys().then(keys => keys.length);
+  },
+  _iterate: function(iterator: (value: any, key: string, iterationNumber: number) => any) {
+    return AsyncStorage.getAllKeys().then(keys => {
+      const promises = keys.map((key, index) => 
+        AsyncStorage.getItem(key).then(value => {
+          if (value !== null) {
+            try {
+              const parsedValue = JSON.parse(value);
+              return iterator(parsedValue, key, index + 1);
+            } catch {
+              return iterator(value, key, index + 1);
+            }
+          }
+        })
+      );
+      return Promise.all(promises);
+    });
+  }
+};
 
 function makeMemoryStore(): KVStore {
   const map = new Map<string, unknown>();
@@ -35,12 +95,18 @@ const stores: Record<string, KVStore> = {};
 export function initStorage(appName = 'ai-dm-app') {
   if (ready) return ready;
   ready = (async () => {
-    if (!isBrowser) { usingMemory = true; return; }
     localforage.config({ name: appName, storeName: 'default', version: 1, description: 'AI DM cache' });
     try {
-      await localforage.setDriver(drivers);
+      if (Platform.OS === 'web') {
+        await localforage.setDriver(webDrivers);
+      } else {
+        // Define and use AsyncStorage driver for React Native
+        localforage.defineDriver(asyncStorageDriver);
+        await localforage.setDriver(ASYNCSTORAGE_DRIVER);
+      }
       await localforage.ready();
-    } catch {
+    } catch (error) {
+      console.warn('Storage initialization failed, falling back to memory:', error);
       usingMemory = true; // e.g., storage blocked
     }
   })();
@@ -52,6 +118,14 @@ export async function getStore(name: string): Promise<KVStore> {
   if (stores[name]) return stores[name];
 
   if (usingMemory || !isBrowser) {
+    // Only use memory store if we're not in browser AND storage init failed
+    if (usingMemory) {
+      stores[name] = makeMemoryStore();
+      return stores[name];
+    }
+  }
+
+  if (usingMemory) {
     stores[name] = makeMemoryStore();
     return stores[name];
   }
