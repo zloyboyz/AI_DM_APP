@@ -3,6 +3,58 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import localforage from 'localforage';
 
+// Configure localforage for React Native
+if (Platform.OS !== 'web') {
+  // Define AsyncStorage driver for localforage
+  const AsyncStorageDriver = {
+    _driver: 'asyncStorageWrapper',
+    _initStorage: function(options: any) {
+      return Promise.resolve();
+    },
+    clear: function() {
+      return AsyncStorage.clear();
+    },
+    getItem: function(key: string) {
+      return AsyncStorage.getItem(key).then(function(value) {
+        return value ? JSON.parse(value) : null;
+      });
+    },
+    iterate: function(iterator: any) {
+      return AsyncStorage.getAllKeys().then(function(keys) {
+        return Promise.all(keys.map(function(key) {
+          return AsyncStorage.getItem(key).then(function(value) {
+            const parsedValue = value ? JSON.parse(value) : null;
+            return iterator(parsedValue, key);
+          });
+        }));
+      });
+    },
+    key: function(n: number) {
+      return AsyncStorage.getAllKeys().then(function(keys) {
+        return keys[n] || null;
+      });
+    },
+    keys: function() {
+      return AsyncStorage.getAllKeys();
+    },
+    length: function() {
+      return AsyncStorage.getAllKeys().then(function(keys) {
+        return keys.length;
+      });
+    },
+    removeItem: function(key: string) {
+      return AsyncStorage.removeItem(key);
+    },
+    setItem: function(key: string, value: any) {
+      return AsyncStorage.setItem(key, JSON.stringify(value));
+    }
+  };
+
+  // Define and set the driver
+  localforage.defineDriver(AsyncStorageDriver);
+  localforage.setDriver('asyncStorageWrapper');
+}
+
 export interface AudioRef {
   path: string;
   public_url?: string;
