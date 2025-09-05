@@ -90,8 +90,8 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               // Clear audio cache
-              const audioDB = localforage.createInstance({ name: "aidm", storeName: "audio" });
-              const metaDB = localforage.createInstance({ name: "aidm", storeName: "meta" });
+              const audioDB = await localforage.createInstance({ name: "aidm", storeName: "audio" });
+              const metaDB = await localforage.createInstance({ name: "aidm", storeName: "meta" });
               
               await audioDB.clear();
               await metaDB.clear();

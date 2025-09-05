@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 import localforage from 'localforage';
 
 // Configure localforage for React Native
+let localforageReady: Promise<void>;
+
 if (Platform.OS !== 'web') {
   // Define AsyncStorage driver for localforage
   const AsyncStorageDriver = {
@@ -50,9 +52,14 @@ if (Platform.OS !== 'web') {
     }
   };
 
-  // Define and set the driver
-  localforage.defineDriver(AsyncStorageDriver);
-  localforage.setDriver('asyncStorageWrapper');
+  // Initialize localforage with AsyncStorage driver
+  localforageReady = (async () => {
+    await localforage.defineDriver(AsyncStorageDriver);
+    await localforage.setDriver('asyncStorageWrapper');
+  })();
+} else {
+  // For web, localforage is ready immediately
+  localforageReady = Promise.resolve();
 }
 
 export interface AudioRef {
@@ -129,6 +136,7 @@ export const secureStorage = {
 // Chat storage functions
 export async function loadChat(sessionId: string): Promise<ChatMessage[]> {
   try {
+    await localforageReady;
     const chatHistory = await localforage.getItem<ChatMessage[]>(`chat_${sessionId}`);
     return chatHistory || [];
   } catch (error) {
@@ -139,6 +147,7 @@ export async function loadChat(sessionId: string): Promise<ChatMessage[]> {
 
 export async function appendChat(sessionId: string, message: ChatMessage): Promise<void> {
   try {
+    await localforageReady;
     const chatHistory = await loadChat(sessionId);
     chatHistory.push(message);
     await localforage.setItem(`chat_${sessionId}`, chatHistory);
@@ -149,6 +158,7 @@ export async function appendChat(sessionId: string, message: ChatMessage): Promi
 
 export async function clearChat(sessionId: string): Promise<void> {
   try {
+    await localforageReady;
     await localforage.removeItem(`chat_${sessionId}`);
   } catch (error) {
     console.error('Error clearing chat:', error);
@@ -157,6 +167,7 @@ export async function clearChat(sessionId: string): Promise<void> {
 
 export async function cacheAudioBlob(sessionId: string, audioRef: AudioRef, blob: Blob): Promise<string> {
   try {
+    await localforageReady;
     const cacheKey = `audio_${sessionId}_${audioRef.path}`;
     await localforage.setItem(cacheKey, blob);
     
@@ -171,6 +182,7 @@ export async function cacheAudioBlob(sessionId: string, audioRef: AudioRef, blob
 
 export async function vacuumOldAudio(): Promise<void> {
   try {
+    await localforageReady;
     const keys = await localforage.keys();
     const audioKeys = keys.filter(key => key.startsWith('audio_'));
     
@@ -196,6 +208,7 @@ export async function vacuumOldAudio(): Promise<void> {
 export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Promise<string> {
   // Check localforage for cached audio blob
   try {
+    await localforageReady;
     const localCacheKey = `audio_${sessionId}_${audioRef.path}`;
     const cachedBlob = await localforage.getItem<Blob>(localCacheKey);
     if (cachedBlob) {
@@ -219,6 +232,7 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
       
       // Cache the blob in localforage
       const localCacheKey = `audio_${sessionId}_${audioRef.path}`;
+      await localforageReady;
       await localforage.setItem(localCacheKey, blob);
       
       // Create and cache blob URL
