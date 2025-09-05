@@ -4,7 +4,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useFrameworkReady } from '../lib/hooks/useFrameworkReady';
-import { initStorage } from '../lib/storage';
+import { initStorage } from '../lib/storage'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 // Keep the splash screen up until the first layout. No top-level await.
 if (Platform.OS !== 'web') {
