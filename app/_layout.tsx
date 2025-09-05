@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { initStorage } from '@/lib/storage';
@@ -12,18 +12,31 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  // Initialize audio/fonts/whatever your hook sets up.
   const ready = useFrameworkReady();
   
   useEffect(() => {
-    initStorage();
+    // Initialize storage
+    const init = async () => {
+      try {
+        await initStorage();
+        console.log('Storage initialized successfully');
+      } catch (error) {
+        console.error('Storage initialization failed:', error);
+      }
+    };
+    init();
   }, []);
 
   useEffect(() => {
-    if (ready && Platform.OS !== 'web') {
-      void SplashScreen.hideAsync();
+    if (Platform.OS !== 'web') {
+      // Hide splash screen after a short delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch(console.error);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
-  }, [ready]);
+  }, []);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
