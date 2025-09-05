@@ -4,7 +4,7 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
     plugins: [
       'expo-router/babel',
-      ['module-resolver', { root: ['./'], alias: { '@': './app', 'assets': './assets' } }],
+      ['module-resolver', { root: ['./'], alias: { '@': './', 'assets': './assets' } }],
     ],
   };
 };
