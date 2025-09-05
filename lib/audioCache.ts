@@ -19,8 +19,9 @@ export async function cacheAudioBlob(sessionId: string, audioRef: AudioRef, blob
       blob: blob
     });
     
-    const blobUrl = URL.createObjectURL(blob);
-    return blobUrl;
+    // On React Native, we can't create blob URLs, so return the cache key
+    // The playback hook will handle retrieving the blob from cache
+    return `cache://${cacheKey}`;
   } catch (error) {
     console.error('Error caching audio blob:', error);
     throw error;
@@ -34,8 +35,9 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
     const cacheKey = `${sessionId}_${audioRef.path}`;
     const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
     if (cachedData && cachedData.blob) {
-      const blobUrl = URL.createObjectURL(cachedData.blob);
-      return blobUrl;
+      // On React Native, we need to handle blob differently
+      // Return a cache reference that the audio playback hook can handle
+      return `cache://${cacheKey}`;
     }
   } catch (error) {
     console.warn('Error checking audio cache:', error);
@@ -61,9 +63,8 @@ export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Pro
         blob: blob
       });
       
-      // Create and return blob URL
-      const blobUrl = URL.createObjectURL(blob);
-      return blobUrl;
+      // Return the public URL directly for React Native
+      return audioRef.public_url;
     } catch (error) {
       console.error('Error fetching and caching audio:', error);
       throw error;

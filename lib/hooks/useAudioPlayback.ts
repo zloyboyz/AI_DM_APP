@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
 import { getPlayableUrl, AudioRef } from '../audioCache';
+import { getStore } from '../storage';
 
 interface AudioPlaybackState {
   isPlaying: boolean;
@@ -53,13 +54,35 @@ export function useAudioPlayback() {
       // Resolve the actual URI to play
       let uri: string;
       if (typeof audioSource === 'string') {
-        uri = audioSource;
+        // Handle cache:// URLs by retrieving from cache
+        if (audioSource.startsWith('cache://')) {
+          const cacheKey = audioSource.replace('cache://', '');
+          const store = await getStore('audio');
+          const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
+          if (cachedData && cachedData.blob) {
+            // For React Native, we need to use the blob directly
+            // This might require converting to a data URL or using a different approach
+            throw new Error('Cached audio playback not yet implemented for React Native');
+          } else {
+            throw new Error('Cached audio not found');
+          }
+        } else {
+          uri = audioSource;
+        }
       } else {
         // It's an AudioRef, try to get the playable URL
         try {
           uri = await getPlayableUrl(sessionId!, audioSource);
-          if (uri.startsWith('blob:')) {
-            blobUrls.current.add(uri);
+          // Handle cache:// URLs
+          if (uri.startsWith('cache://')) {
+            const cacheKey = uri.replace('cache://', '');
+            const store = await getStore('audio');
+            const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
+            if (cachedData && cachedData.blob) {
+              throw new Error('Cached audio playback not yet implemented for React Native');
+            } else {
+              throw new Error('Cached audio not found');
+            }
           }
         } catch (error) {
           console.warn('Audio file not available:', audioSource.path);
