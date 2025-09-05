@@ -73,6 +73,9 @@ const asyncStorageDriver = {
   }
 };
 
+// Define the AsyncStorage driver at module level
+localforage.defineDriver(asyncStorageDriver);
+
 function makeMemoryStore(): KVStore {
   const map = new Map<string, unknown>();
   return {
@@ -100,8 +103,6 @@ export function initStorage(appName = 'ai-dm-app') {
       if (Platform.OS === 'web') {
         await localforage.setDriver(webDrivers);
       } else {
-        // Define and use AsyncStorage driver for React Native
-        localforage.defineDriver(asyncStorageDriver);
         await localforage.setDriver(ASYNCSTORAGE_DRIVER);
       }
       await localforage.ready();
