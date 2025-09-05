@@ -1,4 +1,6 @@
 // lib/audioCache.ts
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { getStore } from './storage';
 
 export interface AudioRef {
@@ -9,69 +11,97 @@ export interface AudioRef {
 const AUDIO = 'audio';
 const META = 'audio_meta';
 
-export async function cacheAudioBlob(sessionId: string, audioRef: AudioRef, blob: Blob): Promise<string> {
+export async function cacheAudio(sessionId: string, audioRef: AudioRef, blob?: Blob): Promise<string> {
   try {
-    const store = await getStore(AUDIO);
     const cacheKey = `${sessionId}_${audioRef.path}`;
-    await store.setItem(cacheKey, {
-      ts: Date.now(),
-      path: audioRef.path,
-      blob: blob
-    });
     
-    // On React Native, we can't create blob URLs, so return the cache key
-    // The playback hook will handle retrieving the blob from cache
-    return `cache://${cacheKey}`;
+    if (Platform.OS === 'web') {
+      // Web platform: store blob in IndexedDB
+      if (blob) {
+        const store = await getStore(AUDIO);
+        await store.setItem(cacheKey, {
+          ts: Date.now(),
+          path: audioRef.path,
+          blob: blob
+        });
+        return `cache://${cacheKey}`;
+      }
+    } else {
+      // Native platform: download and store as file
+      if (audioRef.public_url) {
+        const response = await fetch(audioRef.public_url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.status}`);
+        }
+        
+        // Create a unique filename
+        const fileName = `audio_${cacheKey.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+        
+        // Download directly to file
+        const downloadResult = await FileSystem.downloadAsync(audioRef.public_url, fileUri);
+        
+        if (downloadResult.status === 200) {
+          // Store file URI in AsyncStorage
+          const store = await getStore(AUDIO);
+          await store.setItem(cacheKey, {
+            ts: Date.now(),
+            path: audioRef.path,
+            fileUri: downloadResult.uri
+          });
+          
+          return downloadResult.uri;
+        } else {
+          throw new Error(`Download failed with status: ${downloadResult.status}`);
+        }
+      }
+    }
+    
+    throw new Error('No audio source available for caching');
   } catch (error) {
-    console.error('Error caching audio blob:', error);
+    console.error('Error caching audio:', error);
     throw error;
   }
 }
 
 export async function getPlayableUrl(sessionId: string, audioRef: AudioRef): Promise<string> {
-  // Check cache for audio blob
+  const cacheKey = `${sessionId}_${audioRef.path}`;
+  
   try {
     const store = await getStore(AUDIO);
-    const cacheKey = `${sessionId}_${audioRef.path}`;
-    const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
-    if (cachedData && cachedData.blob) {
-      // On React Native, we need to handle blob differently
-      // Return a cache reference that the audio playback hook can handle
-      return `cache://${cacheKey}`;
+    const cachedData = await store.getItem<any>(cacheKey);
+    
+    if (cachedData) {
+      if (Platform.OS === 'web' && cachedData.blob) {
+        // Web: create blob URL
+        const blobUrl = URL.createObjectURL(cachedData.blob);
+        return blobUrl;
+      } else if (Platform.OS !== 'web' && cachedData.fileUri) {
+        // Native: check if file still exists
+        const fileInfo = await FileSystem.getInfoAsync(cachedData.fileUri);
+        if (fileInfo.exists) {
+          return cachedData.fileUri;
+        } else {
+          // File was deleted, remove from cache
+          await store.removeItem(cacheKey);
+        }
+      }
     }
   } catch (error) {
     console.warn('Error checking audio cache:', error);
   }
 
-  // If we have a public URL, use it directly
+  // If not cached or cache invalid, try to cache now
   if (audioRef.public_url) {
     try {
-      // Fetch and cache the audio
-      const response = await fetch(audioRef.public_url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.status}`);
-      }
-      
-      const blob = await response.blob();
-      
-      // Cache the blob
-      const store = await getStore(AUDIO);
-      const cacheKey = `${sessionId}_${audioRef.path}`;
-      await store.setItem(cacheKey, {
-        ts: Date.now(),
-        path: audioRef.path,
-        blob: blob
-      });
-      
-      // Return the public URL directly for React Native
-      return audioRef.public_url;
+      return await cacheAudio(sessionId, audioRef);
     } catch (error) {
-      console.error('Error fetching and caching audio:', error);
-      throw error;
+      console.error('Error caching audio on demand:', error);
+      // Fall back to direct URL if available
+      return audioRef.public_url;
     }
   }
 
-  // If no public URL and no cache, throw error
   throw new Error(`Audio file not available: ${audioRef.path}`);
 }
 
@@ -80,8 +110,14 @@ export async function vacuumOldAudio(olderThanMs: number = 7 * 24 * 60 * 60 * 10
     const store = await getStore(AUDIO);
     const cutoffTime = Date.now() - olderThanMs;
     
-    await store.iterate<{ ts: number; path: string; blob: Blob }>((value, key) => {
+    await store.iterate<any>((value, key) => {
       if (value?.ts && value.ts < cutoffTime) {
+        // Delete file on native platforms
+        if (Platform.OS !== 'web' && value.fileUri) {
+          FileSystem.deleteAsync(value.fileUri, { idempotent: true }).catch(err => 
+            console.warn('Error deleting old audio file:', err)
+          );
+        }
         store.removeItem(key);
       }
     });
@@ -94,6 +130,18 @@ export async function clearAllAudioCache(): Promise<void> {
   try {
     const audioStore = await getStore(AUDIO);
     const metaStore = await getStore(META);
+    
+    // Delete all cached files on native platforms
+    if (Platform.OS !== 'web') {
+      await audioStore.iterate<any>((value, key) => {
+        if (value?.fileUri) {
+          FileSystem.deleteAsync(value.fileUri, { idempotent: true }).catch(err => 
+            console.warn('Error deleting cached audio file:', err)
+          );
+        }
+      });
+    }
+    
     await audioStore.clear();
     await metaStore.clear();
   } catch (error) {
@@ -106,3 +154,6 @@ export function clearAudioCache(): void {
   // Note: Individual blob URLs are now managed by the audio playback hook
   // This function is kept for backward compatibility but no longer needed
 }
+
+// Backward compatibility
+export const cacheAudioBlob = cacheAudio;

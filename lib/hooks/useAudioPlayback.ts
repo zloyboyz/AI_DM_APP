@@ -1,9 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
 import { getPlayableUrl, AudioRef } from '../audioCache';
-import { getStore } from '../storage';
 
 interface AudioPlaybackState {
   isPlaying: boolean;
@@ -22,9 +20,10 @@ export function useAudioPlayback() {
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const blobUrls = useRef<Set<string>>(new Set());
-  const tempFileUris = useRef<Set<string>>(new Set());
 
   const cleanup = useCallback(async () => {
+    console.log('Cleaning up audio playback');
+    
     if (soundRef.current) {
       try {
         await soundRef.current.stopAsync();
@@ -35,24 +34,14 @@ export function useAudioPlayback() {
       soundRef.current = null;
     }
     
-    // Revoke any blob URLs we created
-    blobUrls.current.forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
-    blobUrls.current.clear();
-    
-    // Clean up temporary files on native
-    if (Platform.OS !== 'web') {
-      for (const uri of tempFileUris.current) {
-        try {
-          await FileSystem.deleteAsync(uri, { idempotent: true });
-        } catch (error) {
-          console.warn('Error deleting temp file:', uri, error);
+    // Revoke any blob URLs we created (web only)
+    if (Platform.OS === 'web') {
+      blobUrls.current.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
         }
-      }
-      tempFileUris.current.clear();
+      });
+      blobUrls.current.clear();
     }
     
     setState(prev => ({
@@ -66,113 +55,20 @@ export function useAudioPlayback() {
 
   const playSingleAudio = useCallback(async (audioSource: string | AudioRef, audioId: string, sessionId?: string) => {
     try {
+      console.log('playSingleAudio called with:', audioSource, 'audioId:', audioId);
+      
       // Resolve the actual URI to play
       let uriToPlay: string;
       if (typeof audioSource === 'string') {
-        // Handle cache:// URLs by retrieving from cache
-        if (audioSource.startsWith('cache://')) {
-          const cacheKey = audioSource.replace('cache://', '');
-          const store = await getStore('audio');
-          const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
-          if (cachedData && cachedData.blob) {
-            if (Platform.OS === 'web') {
-              // For web, create blob URL
-              const blobUrl = URL.createObjectURL(cachedData.blob);
-              blobUrls.current.add(blobUrl);
-              uriToPlay = blobUrl;
-            } else {
-              // For React Native, write blob to temporary file
-              const tempFileName = `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp3`;
-              const tempFileUri = `${FileSystem.cacheDirectory}${tempFileName}`;
-              
-              // Check if we already have this file cached
-              const existingUri = Array.from(tempFileUris.current).find(uri => 
-                uri.includes(cacheKey.replace(/[^a-zA-Z0-9]/g, '_'))
-              );
-              
-              if (existingUri) {
-                const fileInfo = await FileSystem.getInfoAsync(existingUri);
-                if (fileInfo.exists) {
-                  uriToPlay = existingUri;
-                } else {
-                  tempFileUris.current.delete(existingUri);
-                  throw new Error('Cached file no longer exists');
-                }
-              } else {
-                // Convert blob to base64 and write to file
-                const base64data = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const result = reader.result as string;
-                    const base64Data = result.split(',')[1];
-                    resolve(base64Data);
-                  };
-                  reader.onerror = reject;
-                  reader.readAsDataURL(cachedData.blob);
-                });
-                
-                await FileSystem.writeAsStringAsync(tempFileUri, base64data, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-                
-                tempFileUris.current.add(tempFileUri);
-                uriToPlay = tempFileUri;
-              }
-            }
-          } else {
-            throw new Error('Cached audio not found');
-          }
-        } else {
-          uriToPlay = audioSource;
-        }
+        uriToPlay = audioSource;
       } else {
-        // It's an AudioRef, try to get the playable URL
+        // It's an AudioRef, get the playable URL
         try {
-          const resolvedUri = await getPlayableUrl(sessionId!, audioSource);
-          // Handle cache:// URLs
-          if (resolvedUri.startsWith('cache://')) {
-            const cacheKey = resolvedUri.replace('cache://', '');
-            const store = await getStore('audio');
-            const cachedData = await store.getItem<{ ts: number; path: string; blob: Blob }>(cacheKey);
-            if (cachedData && cachedData.blob) {
-              if (Platform.OS === 'web') {
-                // For web, create blob URL
-                const blobUrl = URL.createObjectURL(cachedData.blob);
-                blobUrls.current.add(blobUrl);
-                uriToPlay = blobUrl;
-              } else {
-                // For React Native, write blob to temporary file
-                const tempFileName = `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp3`;
-                const tempFileUri = `${FileSystem.cacheDirectory}${tempFileName}`;
-                
-                // Convert blob to base64 and write to file
-                const base64data = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const result = reader.result as string;
-                    const base64Data = result.split(',')[1];
-                    resolve(base64Data);
-                  };
-                  reader.onerror = reject;
-                  reader.readAsDataURL(cachedData.blob);
-                });
-                
-                await FileSystem.writeAsStringAsync(tempFileUri, base64data, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-                
-                tempFileUris.current.add(tempFileUri);
-                uriToPlay = tempFileUri;
-              }
-            } else {
-              throw new Error('Cached audio not found');
-            }
-          } else {
-            uriToPlay = resolvedUri;
-          }
+          uriToPlay = await getPlayableUrl(sessionId!, audioSource);
+          console.log('Resolved AudioRef to URI:', uriToPlay);
         } catch (error) {
-          console.warn('Audio file not available:', audioSource.path);
-          // Skip this audio file and continue
+          console.warn('Audio file not available:', audioSource.path, error);
+          // Skip this audio file and continue with next in sequence
           setState(prev => {
             if (prev.currentSequence.length > 0 && prev.currentIndex < prev.currentSequence.length - 1) {
               // Try next file in sequence
@@ -204,6 +100,11 @@ export function useAudioPlayback() {
         }
       }
       
+      // Track blob URLs for cleanup (web only)
+      if (Platform.OS === 'web' && uriToPlay.startsWith('blob:')) {
+        blobUrls.current.add(uriToPlay);
+      }
+      
       // Only unload the current sound if we're switching to a different one
       if (soundRef.current) {
         try {
@@ -215,17 +116,15 @@ export function useAudioPlayback() {
         soundRef.current = null;
       }
 
-      let sound: Audio.Sound;
+      console.log('Creating sound from URI:', uriToPlay);
       
-      // Create new sound instance each time
+      // Create new sound instance
       const { sound: newSound } = await Audio.Sound.createAsync({ uri: uriToPlay });
-      sound = newSound;
-
-      soundRef.current = sound;
+      soundRef.current = newSound;
 
       // Set up playback status update
-      sound.setOnPlaybackStatusUpdate((status) => {
-        console.log('Playback status:', status);
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        console.log('Playback status update:', status);
         if (status.isLoaded) {
           if (status.didJustFinish) {
             console.log('Audio finished playing');
@@ -248,13 +147,6 @@ export function useAudioPlayback() {
                 };
               } else {
                 // Sequence finished or single file finished
-                setState(prevState => ({
-                  ...prevState,
-                  isPlaying: false,
-                  currentlyPlayingId: null,
-                  currentSequence: [],
-                  currentIndex: 0,
-                }));
                 return {
                   ...prev,
                   isPlaying: false,
@@ -265,17 +157,26 @@ export function useAudioPlayback() {
               }
             });
           } else {
-            console.log('Audio playing status:', status.isPlaying);
             setState(prev => ({
               ...prev,
               isPlaying: status.isPlaying || false,
             }));
           }
+        } else if (status.error) {
+          console.error('Audio playback error:', status.error);
+          setState(prev => ({
+            ...prev,
+            isPlaying: false,
+            currentlyPlayingId: null,
+            currentSequence: [],
+            currentIndex: 0,
+          }));
         }
       });
 
-      console.log('Starting audio playback for:', uriToPlay);
-      await sound.playAsync();
+      console.log('Starting audio playback');
+      await newSound.playAsync();
+      
     } catch (error) {
       console.error('Error playing audio:', error);
       setState(prev => ({
@@ -286,11 +187,12 @@ export function useAudioPlayback() {
         currentIndex: 0,
       }));
     }
-  }, [cleanup]);
+  }, []);
 
   const playAudio = useCallback(async (audioSources: string | AudioRef | (string | AudioRef)[], messageId: string, sessionId?: string) => {
     try {
       console.log('playAudio called for messageId:', messageId);
+      
       // Stop any currently playing audio before starting new sequence
       await cleanup();
       
@@ -309,6 +211,7 @@ export function useAudioPlayback() {
       const firstAudioId = sources.length > 1 ? `${messageId}-0` : messageId;
       console.log('Starting first audio source:', firstSource);
       await playSingleAudio(firstSource, firstAudioId, sessionId);
+      
     } catch (error) {
       console.error('Error starting audio playback:', error);
       await cleanup();
