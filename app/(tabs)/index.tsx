@@ -29,7 +29,7 @@ interface DmResponse {
 }
 
 // Direct webhook URL - bypassing the API route
-const WEBHOOK_URL = 'https://zloyboy.app.n8n.cloud/webhook-test/1f43cae2-44e2-4bc5-b5fe-e3ec5b44f4c8';
+const WEBHOOK_URL = 'https://zloyboy.app.n8n.cloud/webhook/1f43cae2-44e2-4bc5-b5fe-e3ec5b44f4c8';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
